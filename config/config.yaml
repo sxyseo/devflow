@@ -1,0 +1,148 @@
+# DevFlow 配置文件
+
+agents:
+  # 核心Agent配置
+  codex:
+    enabled: true
+    model: gpt-4
+    max_tasks: 3
+    timeout: 3600
+    skills:
+      - coding
+      - refactoring
+      - debugging
+  
+  claude-code:
+    enabled: true
+    model: claude-3-opus
+    max_tasks: 3
+    timeout: 3600
+    skills:
+      - code-review
+      - architecture
+      - documentation
+  
+  taskmaster:
+    enabled: true
+    model: claude-3-sonnet
+    max_tasks: 10
+    timeout: 1800
+    skills:
+      - prd-analysis
+      - task-breakdown
+      - prioritization
+
+# 工作流配置
+workflows:
+  standard:
+    name: "标准开发流程"
+    steps:
+      - agent: taskmaster
+        action: analyze-prd
+      - agent: taskmaster
+        action: generate-tasks
+      - agent: codex
+        action: implement
+      - agent: claude-code
+        action: review
+      - agent: codex
+        action: fix-issues
+      - agent: system
+        action: commit
+  
+  bugfix:
+    name: "Bug修复流程"
+    steps:
+      - agent: codex
+        action: analyze-bug
+      - agent: codex
+        action: fix-bug
+      - agent: claude-code
+        action: verify-fix
+      - agent: system
+        action: commit
+
+# 调度配置
+scheduling:
+  algorithm: priority  # priority | round-robin | greedy
+  max_parallel: 4
+  retry_policy:
+    max_retries: 3
+    backoff: exponential
+    base_delay: 5
+
+# 监控配置
+monitoring:
+  enabled: true
+  interval: 60  # 秒
+  metrics:
+    - cpu_usage
+    - memory_usage
+    - task_completion_rate
+    - error_rate
+
+# Git配置
+git:
+  auto_commit: true
+  commit_interval: 300  # 秒
+  push_on_commit: true
+  branch_strategy: feature  # feature | trunk
+
+# 质量门禁
+quality_gates:
+  enabled: true
+  strict_mode: true
+  
+  checks:
+    - name: test-coverage
+      threshold: 80
+      required: true
+    
+    - name: lint
+      threshold: 0
+      required: true
+    
+    - name: security-scan
+      threshold: 0
+      required: true
+    
+    - name: code-review
+      threshold: 1
+      required: true
+
+# 通知配置
+notifications:
+  enabled: true
+  channels:
+    - type: feishu
+      webhook: ${FEISHU_WEBHOOK}
+      events:
+        - task-completed
+        - task-failed
+        - system-alert
+    
+    - type: email
+      address: ${ADMIN_EMAIL}
+      events:
+        - critical-error
+        - daily-report
+
+# 记忆和学习
+memory:
+  enabled: true
+  backend: json  # json | sqlite | graphiti
+  
+  retention:
+    experiences: 90  # 天
+    patterns: 180
+    lessons: 365
+
+# 自我进化
+evolution:
+  enabled: true
+  analyze_interval: 86400  # 秒（每天）
+  
+  actions:
+    - optimize-prompts
+    - create-new-skills
+    - update-configurations

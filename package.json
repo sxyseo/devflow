@@ -1,0 +1,33 @@
+{
+  "name": "devflow",
+  "version": "1.0.0",
+  "description": "AI驱动全自治开发系统",
+  "main": "index.js",
+  "scripts": {
+    "start": "python3 scripts/start-tmux.sh",
+    "discover": "python3 scripts/auto-discover.sh",
+    "commit": "python3 scripts/auto-commit.sh",
+    "monitor": "python3 scripts/auto-monitor.sh",
+    "dashboard": "cd dashboard && npm run dev",
+    "test": "pytest tests/",
+    "lint": "ruff check ."
+  },
+  "keywords": [
+    "ai",
+    "automation",
+    "development",
+    "agents",
+    "openclaw",
+    "taskmaster",
+    "bmad"
+  ],
+  "author": "Abel",
+  "license": "MIT",
+  "dependencies": {
+    "openclaw": "latest"
+  },
+  "devDependencies": {
+    "pytest": "^7.0.0",
+    "ruff": "^0.1.0"
+  }
+}
