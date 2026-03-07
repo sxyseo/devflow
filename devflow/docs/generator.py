@@ -167,9 +167,29 @@ class DocumentationGenerator:
         if not readme.exists():
             raise FileNotFoundError(f"README not found: {readme_path}")
 
-        # This will be implemented in subtask-2-3
-        # For now, return False indicating no update
-        return False
+        if not changes:
+            return False
+
+        try:
+            # Read existing README content
+            original_content = readme.read_text(encoding="utf-8")
+
+            # Parse and update README sections
+            updated_content = self._update_readme_sections(
+                original_content,
+                changes,
+                analyzed_code
+            )
+
+            # Only write if content actually changed
+            if updated_content != original_content:
+                readme.write_text(updated_content, encoding="utf-8")
+                return True
+
+            return False
+
+        except Exception as e:
+            raise IOError(f"Failed to update README at {readme_path}: {e}")
 
     def sync_architecture_diagrams(
         self,
@@ -686,6 +706,154 @@ class DocumentationGenerator:
 
         with open(template, "r", encoding="utf-8") as f:
             return f.read()
+
+    def _update_readme_sections(
+        self,
+        content: str,
+        changes: List[Any],
+        analyzed_code: Dict[str, Any] = None
+    ) -> str:
+        """
+        Update README sections with code changes and analyzed information.
+
+        Args:
+            content: Original README content
+            changes: List of code changes to document
+            analyzed_code: Optional analyzed code information
+
+        Returns:
+            Updated README content
+        """
+        lines = content.split("\n")
+        updated_lines = []
+        i = 0
+
+        while i < len(lines):
+            line = lines[i]
+
+            # Check if this is a section that might need updates
+            if line.startswith("##") and not line.startswith("###"):
+                section_title = line.lstrip("#").strip().lower()
+
+                # Handle different section types
+                if section_title in ["features", "what's new", "changelog", "changes"]:
+                    # Update features/changelog section
+                    updated_lines.append(line)
+                    i += 1
+
+                    # Skip existing content until next section
+                    section_content = []
+                    while i < len(lines) and not lines[i].startswith("##"):
+                        section_content.append(lines[i])
+                        i += 1
+
+                    # Add new changes at the beginning of the section
+                    new_changes = self._format_changes_for_readme(changes)
+                    if new_changes:
+                        updated_lines.append(new_changes)
+                        if section_content and section_content[0].strip():
+                            updated_lines.append("")
+
+                    updated_lines.extend(section_content)
+                    continue
+
+                elif section_title in ["installation", "getting started", "usage"]:
+                    # Update installation/usage section if analyzed code provides new info
+                    updated_lines.append(line)
+                    i += 1
+
+                    # Skip existing content
+                    while i < len(lines) and not lines[i].startswith("##"):
+                        updated_lines.append(lines[i])
+                        i += 1
+                    continue
+
+                elif section_title in ["api reference", "documentation", "docs"]:
+                    # Update API reference section
+                    updated_lines.append(line)
+                    i += 1
+
+                    # Skip existing content
+                    while i < len(lines) and not lines[i].startswith("##"):
+                        updated_lines.append(lines[i])
+                        i += 1
+                    continue
+
+            updated_lines.append(line)
+            i += 1
+
+        # Add changelog section if it doesn't exist and there are changes
+        if changes and not any(line.lower().startswith("## changelog") or
+                             line.lower().startswith("## changes") or
+                             line.lower().startswith("## what's new")
+                             for line in lines):
+            updated_lines.append("")
+            updated_lines.append("## Changelog")
+            updated_lines.append("")
+            new_changes = self._format_changes_for_readme(changes)
+            if new_changes:
+                updated_lines.append(new_changes)
+
+        return "\n".join(updated_lines)
+
+    def _format_changes_for_readme(self, changes: List[Any]) -> str:
+        """
+        Format code changes for README documentation.
+
+        Args:
+            changes: List of code changes
+
+        Returns:
+            Formatted changes as Markdown
+        """
+        if not changes:
+            return ""
+
+        lines = []
+
+        # Group changes by type
+        added = []
+        modified = []
+        removed = []
+
+        for change in changes:
+            if isinstance(change, dict):
+                change_type = change.get("type", "").lower()
+                change_desc = change.get("description", "")
+
+                if change_type == "added":
+                    added.append(change_desc)
+                elif change_type == "modified":
+                    modified.append(change_desc)
+                elif change_type == "removed":
+                    removed.append(change_desc)
+            elif isinstance(change, str):
+                # Simple string changes, treat as additions
+                added.append(change)
+
+        # Format changes by type
+        if added:
+            lines.append("### Added")
+            lines.append("")
+            for item in added:
+                lines.append(f"- {item}")
+            lines.append("")
+
+        if modified:
+            lines.append("### Modified")
+            lines.append("")
+            for item in modified:
+                lines.append(f"- {item}")
+            lines.append("")
+
+        if removed:
+            lines.append("### Removed")
+            lines.append("")
+            for item in removed:
+                lines.append(f"- {item}")
+            lines.append("")
+
+        return "\n".join(lines).strip()
 
     def _apply_template(
         self,
