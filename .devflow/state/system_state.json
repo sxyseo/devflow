@@ -1,0 +1,27 @@
+{
+  "agents": {},
+  "tasks": {},
+  "pipelines": {
+    "test-pipeline-1": {
+      "id": "test-pipeline-1",
+      "type": "ci",
+      "commit_sha": "abc123",
+      "branch": "main",
+      "triggered_by": "test-user",
+      "status": "running",
+      "created_at": "2026-03-07T10:09:14.558685",
+      "started_at": "2026-03-07T10:09:14.559014",
+      "completed_at": null,
+      "stages": [
+        {
+          "name": "build",
+          "status": "running"
+        }
+      ],
+      "result": null,
+      "error": null
+    }
+  },
+  "workflows": {},
+  "metrics": {}
+}

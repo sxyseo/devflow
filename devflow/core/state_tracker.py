@@ -34,6 +34,17 @@ class TaskStatus(Enum):
     CANCELLED = "cancelled"
 
 
+class PipelineStatus(Enum):
+    """CI/CD pipeline execution status."""
+    PENDING = "pending"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    SKIPPED = "skipped"
+
+
 class StateTracker:
     """
     Tracks the state of the entire DevFlow system.
@@ -41,6 +52,7 @@ class StateTracker:
     Maintains state for:
     - All agents and their status
     - All tasks and their progress
+    - CI/CD pipelines and their execution state
     - Workflow execution state
     - System metrics
     """
@@ -52,6 +64,7 @@ class StateTracker:
         # State dictionaries
         self.agents: Dict[str, Dict[str, Any]] = {}
         self.tasks: Dict[str, Dict[str, Any]] = {}
+        self.pipelines: Dict[str, Dict[str, Any]] = {}
         self.workflows: Dict[str, Dict[str, Any]] = {}
         self.metrics: Dict[str, Any] = {}
 
@@ -198,6 +211,55 @@ class StateTracker:
 
             return ready_tasks[:limit] if limit else ready_tasks
 
+    def create_pipeline(self, pipeline_id: str, pipeline_type: str, commit_sha: str,
+                       branch: str, triggered_by: str = None):
+        """Create a new CI/CD pipeline execution."""
+        with self.lock:
+            self.pipelines[pipeline_id] = {
+                "id": pipeline_id,
+                "type": pipeline_type,
+                "commit_sha": commit_sha,
+                "branch": branch,
+                "triggered_by": triggered_by,
+                "status": PipelineStatus.PENDING.value,
+                "created_at": datetime.utcnow().isoformat(),
+                "started_at": None,
+                "completed_at": None,
+                "stages": [],
+                "result": None,
+                "error": None,
+            }
+            self.save()
+
+    def update_pipeline_status(self, pipeline_id: str, status: PipelineStatus,
+                              stages: List[Dict[str, Any]] = None,
+                              result: Any = None, error: str = None):
+        """Update pipeline status."""
+        with self.lock:
+            if pipeline_id not in self.pipelines:
+                raise ValueError(f"Pipeline {pipeline_id} not found")
+
+            pipeline = self.pipelines[pipeline_id]
+            pipeline["status"] = status.value
+
+            if status == PipelineStatus.RUNNING and pipeline["started_at"] is None:
+                pipeline["started_at"] = datetime.utcnow().isoformat()
+
+            if status in [PipelineStatus.COMPLETED, PipelineStatus.FAILED,
+                         PipelineStatus.CANCELLED, PipelineStatus.SKIPPED]:
+                pipeline["completed_at"] = datetime.utcnow().isoformat()
+
+            if stages is not None:
+                pipeline["stages"] = stages
+
+            if result is not None:
+                pipeline["result"] = result
+
+            if error is not None:
+                pipeline["error"] = error
+
+            self.save()
+
     def get_agent_status(self, agent_id: str) -> Optional[Dict[str, Any]]:
         """Get agent status."""
         return self.agents.get(agent_id)
@@ -206,6 +268,10 @@ class StateTracker:
         """Get task status."""
         return self.tasks.get(task_id)
 
+    def get_pipeline_status(self, pipeline_id: str) -> Optional[Dict[str, Any]]:
+        """Get pipeline status."""
+        return self.pipelines.get(pipeline_id)
+
     def get_all_agents(self) -> Dict[str, Dict[str, Any]]:
         """Get all agents."""
         return self.agents.copy()
@@ -213,6 +279,10 @@ class StateTracker:
     def get_all_tasks(self) -> Dict[str, Dict[str, Any]]:
         """Get all tasks."""
         return self.tasks.copy()
+
+    def get_all_pipelines(self) -> Dict[str, Dict[str, Any]]:
+        """Get all pipelines."""
+        return self.pipelines.copy()
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get system metrics."""
@@ -227,6 +297,14 @@ class StateTracker:
             active_agents = sum(1 for a in self.agents.values()
                               if a["status"] == AgentStatus.RUNNING.value)
 
+            total_pipelines = len(self.pipelines)
+            completed_pipelines = sum(1 for p in self.pipelines.values()
+                                     if p["status"] == PipelineStatus.COMPLETED.value)
+            failed_pipelines = sum(1 for p in self.pipelines.values()
+                                  if p["status"] == PipelineStatus.FAILED.value)
+            running_pipelines = sum(1 for p in self.pipelines.values()
+                                   if p["status"] == PipelineStatus.RUNNING.value)
+
             return {
                 "tasks": {
                     "total": total_tasks,
@@ -240,6 +318,13 @@ class StateTracker:
                     "active": active_agents,
                     "idle": total_agents - active_agents,
                 },
+                "pipelines": {
+                    "total": total_pipelines,
+                    "completed": completed_pipelines,
+                    "failed": failed_pipelines,
+                    "running": running_pipelines,
+                    "success_rate": completed_pipelines / total_pipelines if total_pipelines > 0 else 0,
+                },
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
@@ -250,6 +335,7 @@ class StateTracker:
         state = {
             "agents": self.agents,
             "tasks": self.tasks,
+            "pipelines": self.pipelines,
             "workflows": self.workflows,
             "metrics": self.metrics,
         }
@@ -265,6 +351,7 @@ class StateTracker:
 
             self.agents = state.get("agents", {})
             self.tasks = state.get("tasks", {})
+            self.pipelines = state.get("pipelines", {})
             self.workflows = state.get("workflows", {})
             self.metrics = state.get("metrics", {})
 
@@ -273,6 +360,7 @@ class StateTracker:
         with self.lock:
             self.agents.clear()
             self.tasks.clear()
+            self.pipelines.clear()
             self.workflows.clear()
             self.metrics.clear()
             self.save()
