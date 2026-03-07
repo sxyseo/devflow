@@ -4,10 +4,17 @@ Prompt Optimizer - Token counting and prompt compression.
 Optimizes prompts to reduce token usage and API costs.
 """
 
+import hashlib
+import json
 import re
 import threading
+from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
+
+from .base import CacheBackend
+from ..config.settings import settings
 
 
 @dataclass
@@ -28,6 +35,375 @@ class OptimizerConfig:
     enable_template_compression: bool = True
     preserve_code_blocks: bool = True
     preserve_structure: bool = True
+    enable_template_caching: bool = True
+
+
+class TemplateCache(CacheBackend):
+    """
+    Cache for prompt templates and their optimized versions.
+
+    Features:
+    - Hash-based cache key generation from prompt content
+    - Persistent file storage
+    - TTL support with expiration checking
+    - Thread-safe operations
+    - Cache statistics tracking
+
+    Storage structure:
+    .devflow/cache/
+      ├── template_index.json   # Index of template cache entries
+      └── templates/            # Individual template entries
+          └── {hash}.json       # Template cache entry data
+    """
+
+    def __init__(self, cache_dir: Optional[Path] = None):
+        """
+        Initialize the template cache.
+
+        Args:
+            cache_dir: Custom cache directory (defaults to .devflow/cache)
+        """
+        super().__init__()
+
+        if cache_dir is None:
+            self.cache_dir = settings.project_root / ".devflow" / "cache"
+        else:
+            self.cache_dir = cache_dir
+
+        self.templates_dir = self.cache_dir / "templates"
+        self.index_file = self.cache_dir / "template_index.json"
+
+        # In-memory index for fast lookups
+        self.index: Dict[str, Dict[str, Any]] = {}
+
+        # Load existing index
+        self.load_index()
+
+    def generate_key(self, prompt: str, config: OptimizerConfig) -> str:
+        """
+        Generate a cache key from prompt and configuration.
+
+        Creates a deterministic hash key that accounts for both
+        the prompt content and optimization settings.
+
+        Args:
+            prompt: The prompt to hash
+            config: Optimizer configuration
+
+        Returns:
+            Hexadecimal hash string
+        """
+        # Create a deterministic string representation
+        key_parts = [prompt]
+
+        # Include relevant config settings that affect optimization
+        config_dict = {
+            "enable_whitespace_removal": config.enable_whitespace_removal,
+            "enable_duplicate_removal": config.enable_duplicate_removal,
+            "enable_template_compression": config.enable_template_compression,
+            "preserve_code_blocks": config.preserve_code_blocks,
+        }
+        key_parts.append(json.dumps(config_dict, sort_keys=True))
+
+        # Join and hash
+        key_string = "|".join(key_parts)
+        return hashlib.sha256(key_string.encode()).hexdigest()
+
+    def get(self, key: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve a cached template from the cache.
+
+        Args:
+            key: Cache key to retrieve
+
+        Returns:
+            Cached template data or None if not found/expired
+        """
+        with self.lock:
+            # Check if key exists in index
+            if key not in self.index:
+                self._record_miss()
+                return None
+
+            entry_data = self.index[key]
+
+            # Check if expired
+            if self._is_expired(entry_data):
+                self.delete(key)
+                self._record_miss()
+                return None
+
+            # Load the entry from disk
+            template_file = self.templates_dir / f"{key}.json"
+            if not template_file.exists():
+                self._record_miss()
+                return None
+
+            try:
+                with open(template_file, 'r') as f:
+                    entry = json.load(f)
+
+                # Update access count
+                entry_data["access_count"] += 1
+                entry_data["last_accessed_at"] = datetime.utcnow().isoformat()
+                self.save_index()
+
+                self._record_hit()
+                return entry
+            except (json.JSONDecodeError, IOError):
+                self._record_miss()
+                return None
+
+    def set(self, key: str, prompt: str, optimized: str, stats: 'PromptStats',
+            ttl: Optional[int] = None) -> bool:
+        """
+        Store a template in the cache.
+
+        Args:
+            key: Cache key to store under
+            prompt: Original prompt
+            optimized: Optimized prompt
+            stats: Optimization statistics
+            ttl: Time to live in seconds (None = no expiration)
+
+        Returns:
+            True if successfully stored
+        """
+        with self.lock:
+            try:
+                # Ensure directories exist
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+                self.templates_dir.mkdir(parents=True, exist_ok=True)
+
+                # Create cache entry
+                now = datetime.utcnow().isoformat()
+                entry = {
+                    "key": key,
+                    "prompt": prompt,
+                    "optimized": optimized,
+                    "original_tokens": stats.original_tokens,
+                    "optimized_tokens": stats.optimized_tokens,
+                    "compression_ratio": stats.compression_ratio,
+                    "optimizations_applied": stats.optimizations_applied,
+                    "ttl": ttl,
+                    "created_at": now,
+                    "updated_at": now,
+                    "access_count": 0,
+                    "last_accessed_at": now,
+                }
+
+                # Write to disk
+                template_file = self.templates_dir / f"{key}.json"
+                with open(template_file, 'w') as f:
+                    json.dump(entry, f, indent=2, default=str)
+
+                # Update index
+                self.index[key] = {
+                    "created_at": now,
+                    "expires_at": self._calculate_expires_at(ttl, now),
+                    "access_count": 0,
+                    "last_accessed_at": now,
+                }
+
+                self.save_index()
+                self._record_set()
+                return True
+            except (IOError, OSError):
+                return False
+
+    def delete(self, key: str) -> bool:
+        """
+        Delete a template from the cache.
+
+        Args:
+            key: Cache key to delete
+
+        Returns:
+            True if key was found and deleted
+        """
+        with self.lock:
+            if key not in self.index:
+                return False
+
+            try:
+                # Remove template file
+                template_file = self.templates_dir / f"{key}.json"
+                if template_file.exists():
+                    template_file.unlink()
+
+                # Remove from index
+                del self.index[key]
+                self.save_index()
+
+                self._record_delete()
+                return True
+            except (IOError, OSError):
+                return False
+
+    def exists(self, key: str) -> bool:
+        """
+        Check if a key exists in the cache.
+
+        Args:
+            key: Cache key to check
+
+        Returns:
+            True if key exists and is not expired
+        """
+        with self.lock:
+            if key not in self.index:
+                return False
+
+            # Check if expired
+            entry_data = self.index[key]
+            if self._is_expired(entry_data):
+                return False
+
+            return True
+
+    def clear(self):
+        """Clear all entries from the cache."""
+        with self.lock:
+            try:
+                # Remove all template files
+                if self.templates_dir.exists():
+                    for template_file in self.templates_dir.glob("*.json"):
+                        template_file.unlink()
+
+                # Clear index
+                self.index.clear()
+                self.save_index()
+            except (IOError, OSError):
+                pass
+
+    def get_size(self) -> int:
+        """
+        Get the number of entries in the cache.
+
+        Returns:
+            Number of cached templates
+        """
+        with self.lock:
+            # Count only non-expired entries
+            count = 0
+            for key, entry_data in self.index.items():
+                if not self._is_expired(entry_data):
+                    count += 1
+            return count
+
+    def get_keys(self, pattern: Optional[str] = None) -> List[str]:
+        """
+        Get all keys matching a pattern.
+
+        Args:
+            pattern: Optional glob pattern to match keys
+
+        Returns:
+            List of cache keys
+        """
+        with self.lock:
+            keys = list(self.index.keys())
+
+            if pattern:
+                # Simple glob-style pattern matching
+                import fnmatch
+                keys = [k for k in keys if fnmatch.fnmatch(k, pattern)]
+
+            return keys
+
+    def cleanup_expired(self) -> int:
+        """
+        Remove all expired entries from the cache.
+
+        Returns:
+            Number of entries removed
+        """
+        with self.lock:
+            removed = 0
+            expired_keys = []
+
+            # Find expired keys
+            for key, entry_data in self.index.items():
+                if self._is_expired(entry_data):
+                    expired_keys.append(key)
+
+            # Remove expired entries
+            for key in expired_keys:
+                if self.delete(key):
+                    removed += 1
+
+            return removed
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """
+        Get detailed cache statistics.
+
+        Returns:
+            Dictionary containing cache metrics
+        """
+        with self.lock:
+            total_entries = len(self.index)
+            total_tokens_saved = 0
+
+            # Calculate total tokens saved across all templates
+            for key in self.index.keys():
+                template_file = self.templates_dir / f"{key}.json"
+                if template_file.exists():
+                    try:
+                        with open(template_file, 'r') as f:
+                            entry = json.load(f)
+                            tokens_saved = entry.get("original_tokens", 0) - entry.get("optimized_tokens", 0)
+                            total_tokens_saved += max(0, tokens_saved)
+                    except (json.JSONDecodeError, IOError):
+                        pass
+
+            return {
+                "total_templates": total_entries,
+                "total_tokens_saved": total_tokens_saved,
+                "hits": self.stats["hits"],
+                "misses": self.stats["misses"],
+                "hit_rate": self.stats["hits"] / (self.stats["hits"] + self.stats["misses"])
+                if (self.stats["hits"] + self.stats["misses"]) > 0 else 0,
+            }
+
+    def _calculate_expires_at(self, ttl: Optional[int], created_at: str) -> Optional[str]:
+        """Calculate expiration timestamp."""
+        if ttl is None:
+            return None
+
+        created = datetime.fromisoformat(created_at)
+        from datetime import timedelta
+        expires = created + timedelta(seconds=ttl)
+        return expires.isoformat()
+
+    def _is_expired(self, entry_data: Dict[str, Any]) -> bool:
+        """Check if an entry is expired."""
+        expires_at = entry_data.get("expires_at")
+        if expires_at is None:
+            return False
+
+        expires = datetime.fromisoformat(expires_at)
+        return datetime.utcnow() > expires
+
+    def load_index(self):
+        """Load cache index from disk."""
+        if self.index_file.exists():
+            try:
+                with open(self.index_file, 'r') as f:
+                    self.index = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                self.index = {}
+        else:
+            self.index = {}
+
+    def save_index(self):
+        """Save cache index to disk."""
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            with open(self.index_file, 'w') as f:
+                json.dump(self.index, f, indent=2, default=str)
+        except (IOError, OSError):
+            pass
 
 
 class PromptOptimizer:
@@ -62,10 +438,19 @@ class PromptOptimizer:
             "total_original_tokens": 0,
             "total_optimized_tokens": 0,
             "total_tokens_saved": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
         }
 
         # Token approximation (rough estimate: ~4 chars per token)
         self.chars_per_token = 4
+
+        # Initialize template cache
+        self.template_cache = TemplateCache()
+        self.cache_enabled = (
+            self.config.enable_template_caching and
+            settings.cache_enabled
+        )
 
     def count_tokens(self, text: str) -> int:
         """
@@ -92,6 +477,9 @@ class PromptOptimizer:
         """
         Optimize a prompt to reduce token usage.
 
+        Checks the template cache first to reuse previously optimized prompts.
+        If not found in cache, performs optimization and caches the result.
+
         Args:
             prompt: The prompt to optimize
             preserve_code_blocks: Whether to preserve code blocks
@@ -100,6 +488,28 @@ class PromptOptimizer:
             Tuple of (optimized_prompt, stats)
         """
         with self.lock:
+            # Check cache first if enabled
+            if self.cache_enabled:
+                cache_key = self.template_cache.generate_key(prompt, self.config)
+                cached = self.template_cache.get(cache_key)
+
+                if cached is not None:
+                    # Cache hit - return cached optimization
+                    self.stats["cache_hits"] += 1
+                    self.stats["prompts_processed"] += 1
+
+                    stats = PromptStats(
+                        original_tokens=cached["original_tokens"],
+                        optimized_tokens=cached["optimized_tokens"],
+                        compression_ratio=cached["compression_ratio"],
+                        optimizations_applied=cached["optimizations_applied"],
+                    )
+
+                    return cached["optimized"], stats
+                else:
+                    self.stats["cache_misses"] += 1
+
+            # Cache miss or caching disabled - perform optimization
             original_tokens = self.count_tokens(prompt)
             optimizations = []
             optimized = prompt
@@ -139,6 +549,18 @@ class PromptOptimizer:
             self.stats["total_original_tokens"] += original_tokens
             self.stats["total_optimized_tokens"] += optimized_tokens
             self.stats["total_tokens_saved"] += tokens_saved
+
+            # Cache the result if enabled
+            if self.cache_enabled:
+                cache_key = self.template_cache.generate_key(prompt, self.config)
+                # Use settings.cache_ttl for template cache TTL
+                self.template_cache.set(
+                    cache_key,
+                    prompt,
+                    optimized,
+                    stats,
+                    ttl=settings.cache_ttl
+                )
 
             return optimized, stats
 
@@ -323,3 +745,37 @@ class PromptOptimizer:
             optimized, stats = self.optimize(prompt)
             results.append((optimized, stats))
         return results
+
+    def clear_template_cache(self):
+        """Clear all cached templates."""
+        self.template_cache.clear()
+        with self.lock:
+            self.stats["cache_hits"] = 0
+            self.stats["cache_misses"] = 0
+
+    def get_template_cache_stats(self) -> Dict[str, Any]:
+        """
+        Get template cache statistics.
+
+        Returns:
+            Dictionary containing cache metrics
+        """
+        return self.template_cache.get_cache_stats()
+
+    def get_cache_size(self) -> int:
+        """
+        Get the number of templates in the cache.
+
+        Returns:
+            Number of cached templates
+        """
+        return self.template_cache.get_size()
+
+    def cleanup_expired_cache_entries(self) -> int:
+        """
+        Remove expired entries from the template cache.
+
+        Returns:
+            Number of entries removed
+        """
+        return self.template_cache.cleanup_expired()
