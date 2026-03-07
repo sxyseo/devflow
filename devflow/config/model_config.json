@@ -1,0 +1,316 @@
+{
+  "version": "1.0.0",
+  "description": "Configuration for multi-model AI provider support in DevFlow",
+  "providers": {
+    "anthropic": {
+      "name": "Anthropic",
+      "enabled": true,
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "base_url": "https://api.anthropic.com",
+      "models": {
+        "claude-3-5-sonnet-20241022": {
+          "name": "Claude 3.5 Sonnet",
+          "type": "chat",
+          "max_tokens": 200000,
+          "input_cost_per_1k": 0.003,
+          "output_cost_per_1k": 0.015,
+          "capabilities": [
+            "code_generation",
+            "code_review",
+            "architecture",
+            "analysis",
+            "writing"
+          ],
+          "priority": 1,
+          "available": true
+        },
+        "claude-3-opus-20240229": {
+          "name": "Claude 3 Opus",
+          "type": "chat",
+          "max_tokens": 200000,
+          "input_cost_per_1k": 0.015,
+          "output_cost_per_1k": 0.075,
+          "capabilities": [
+            "complex_reasoning",
+            "code_generation",
+            "code_review",
+            "architecture",
+            "analysis"
+          ],
+          "priority": 2,
+          "available": true
+        },
+        "claude-3-haiku-20240307": {
+          "name": "Claude 3 Haiku",
+          "type": "chat",
+          "max_tokens": 200000,
+          "input_cost_per_1k": 0.00025,
+          "output_cost_per_1k": 0.00125,
+          "capabilities": [
+            "simple_tasks",
+            "quick_response",
+            "classification"
+          ],
+          "priority": 3,
+          "available": true
+        }
+      }
+    },
+    "openai": {
+      "name": "OpenAI",
+      "enabled": true,
+      "api_key_env": "OPENAI_API_KEY",
+      "base_url": "https://api.openai.com/v1",
+      "models": {
+        "gpt-4-turbo": {
+          "name": "GPT-4 Turbo",
+          "type": "chat",
+          "max_tokens": 128000,
+          "input_cost_per_1k": 0.01,
+          "output_cost_per_1k": 0.03,
+          "capabilities": [
+            "code_generation",
+            "code_review",
+            "analysis",
+            "writing"
+          ],
+          "priority": 1,
+          "available": true
+        },
+        "gpt-4": {
+          "name": "GPT-4",
+          "type": "chat",
+          "max_tokens": 8192,
+          "input_cost_per_1k": 0.03,
+          "output_cost_per_1k": 0.06,
+          "capabilities": [
+            "complex_reasoning",
+            "code_generation",
+            "code_review"
+          ],
+          "priority": 2,
+          "available": true
+        },
+        "gpt-3.5-turbo": {
+          "name": "GPT-3.5 Turbo",
+          "type": "chat",
+          "max_tokens": 16385,
+          "input_cost_per_1k": 0.0005,
+          "output_cost_per_1k": 0.0015,
+          "capabilities": [
+            "simple_tasks",
+            "quick_response",
+            "classification"
+          ],
+          "priority": 3,
+          "available": true
+        }
+      }
+    },
+    "local": {
+      "name": "Local Models",
+      "enabled": false,
+      "api_key_env": null,
+      "base_url": "http://localhost:11434",
+      "models": {
+        "llama3-70b": {
+          "name": "Llama 3 70B",
+          "type": "chat",
+          "max_tokens": 8192,
+          "input_cost_per_1k": 0.0,
+          "output_cost_per_1k": 0.0,
+          "capabilities": [
+            "code_generation",
+            "code_review",
+            "analysis"
+          ],
+          "priority": 2,
+          "available": false
+        },
+        "codellama-34b": {
+          "name": "Code Llama 34B",
+          "type": "chat",
+          "max_tokens": 16384,
+          "input_cost_per_1k": 0.0,
+          "output_cost_per_1k": 0.0,
+          "capabilities": [
+            "code_generation",
+            "code_review"
+          ],
+          "priority": 3,
+          "available": false
+        }
+      }
+    }
+  },
+  "task_mappings": {
+    "code_generation": {
+      "preferred_models": [
+        "anthropic/claude-3-5-sonnet-20241022",
+        "openai/gpt-4-turbo"
+      ],
+      "fallback_models": [
+        "openai/gpt-4",
+        "anthropic/claude-3-opus-20240229"
+      ],
+      "min_capability": "code_generation"
+    },
+    "code_review": {
+      "preferred_models": [
+        "anthropic/claude-3-5-sonnet-20241022",
+        "openai/gpt-4-turbo"
+      ],
+      "fallback_models": [
+        "openai/gpt-4",
+        "anthropic/claude-3-opus-20240229"
+      ],
+      "min_capability": "code_review"
+    },
+    "architecture": {
+      "preferred_models": [
+        "anthropic/claude-3-5-sonnet-20241022",
+        "anthropic/claude-3-opus-20240229"
+      ],
+      "fallback_models": [
+        "openai/gpt-4"
+      ],
+      "min_capability": "architecture"
+    },
+    "analysis": {
+      "preferred_models": [
+        "anthropic/claude-3-5-sonnet-20241022",
+        "openai/gpt-4-turbo"
+      ],
+      "fallback_models": [
+        "anthropic/claude-3-haiku-20240307",
+        "openai/gpt-3.5-turbo"
+      ],
+      "min_capability": "analysis"
+    },
+    "writing": {
+      "preferred_models": [
+        "anthropic/claude-3-5-sonnet-20241022",
+        "openai/gpt-4-turbo"
+      ],
+      "fallback_models": [
+        "openai/gpt-3.5-turbo",
+        "anthropic/claude-3-haiku-20240307"
+      ],
+      "min_capability": "writing"
+    },
+    "simple_tasks": {
+      "preferred_models": [
+        "anthropic/claude-3-haiku-20240307",
+        "openai/gpt-3.5-turbo"
+      ],
+      "fallback_models": [
+        "openai/gpt-4-turbo"
+      ],
+      "min_capability": "simple_tasks"
+    },
+    "quick_response": {
+      "preferred_models": [
+        "anthropic/claude-3-haiku-20240307",
+        "openai/gpt-3.5-turbo"
+      ],
+      "fallback_models": [],
+      "min_capability": "quick_response"
+    }
+  },
+  "agent_mappings": {
+    "product-owner": {
+      "task_type": "writing",
+      "model_override": null
+    },
+    "business-analyst": {
+      "task_type": "analysis",
+      "model_override": null
+    },
+    "architect": {
+      "task_type": "architecture",
+      "model_override": null
+    },
+    "ux-designer": {
+      "task_type": "writing",
+      "model_override": null
+    },
+    "scrum-master": {
+      "task_type": "writing",
+      "model_override": null
+    },
+    "dev-story": {
+      "task_type": "code_generation",
+      "model_override": null
+    },
+    "code-review": {
+      "task_type": "code_review",
+      "model_override": null
+    },
+    "qa-tester": {
+      "task_type": "analysis",
+      "model_override": null
+    }
+  },
+  "fallback_config": {
+    "enabled": true,
+    "max_attempts": 3,
+    "retry_delay_seconds": 1,
+    "fallback_on": [
+      "rate_limit_error",
+      "api_error",
+      "timeout_error",
+      "authentication_error"
+    ]
+  },
+  "cost_optimization": {
+    "enabled": true,
+    "max_cost_per_task": 0.5,
+    "prefer_cheaper_for_simple_tasks": true,
+    "track_costs": true
+  },
+  "performance_tracking": {
+    "enabled": true,
+    "track_latency": true,
+    "track_success_rate": true,
+    "track_token_usage": true,
+    "metrics_window_hours": 24,
+    "min_samples_for_metrics": 10
+  },
+  "selection_strategy": {
+    "default": "balanced",
+    "strategies": {
+      "balanced": {
+        "description": "Balance between cost, speed, and quality",
+        "weights": {
+          "cost": 0.3,
+          "speed": 0.3,
+          "quality": 0.4
+        }
+      },
+      "cost_optimized": {
+        "description": "Prefer cheaper models",
+        "weights": {
+          "cost": 0.7,
+          "speed": 0.2,
+          "quality": 0.1
+        }
+      },
+      "quality_optimized": {
+        "description": "Prefer highest quality models",
+        "weights": {
+          "cost": 0.1,
+          "speed": 0.2,
+          "quality": 0.7
+        }
+      },
+      "speed_optimized": {
+        "description": "Prefer faster models",
+        "weights": {
+          "cost": 0.2,
+          "speed": 0.7,
+          "quality": 0.1
+        }
+      }
+    }
+  }
+}
