@@ -8,9 +8,11 @@ Provides integration with popular CI/CD platforms including:
 """
 
 from .base import PipelineIntegration, PipelineConfig, PipelineStatus
+from .github_actions import GitHubActions
 
 __all__ = [
     "PipelineIntegration",
     "PipelineConfig",
     "PipelineStatus",
+    "GitHubActions",
 ]
