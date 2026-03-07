@@ -438,10 +438,13 @@ class Jenkins(PipelineIntegration):
     def get_build_status(
         self,
         job_name: str = None,
-        build_number: int = None
+        build_number: int = None,
+        poll: bool = False,
+        timeout: int = 600,
+        interval: int = 10
     ) -> Dict[str, Any]:
         """
-        Get detailed status of a build.
+        Get detailed status of a build with optional polling.
 
         This is a Jenkins-specific method that provides comprehensive
         status information beyond the generic get_pipeline_status() method.
@@ -449,6 +452,9 @@ class Jenkins(PipelineIntegration):
         Args:
             job_name: Name of the job
             build_number: Build number
+            poll: Whether to continuously poll until completion (default: False)
+            timeout: Maximum polling time in seconds (default: 600)
+            interval: Polling interval in seconds (default: 10)
 
         Returns:
             Dictionary containing:
@@ -466,38 +472,105 @@ class Jenkins(PipelineIntegration):
         Raises:
             ValueError: If build is not found
             ConnectionError: If unable to reach Jenkins API
+            TimeoutError: If polling timeout is exceeded
+
+        Example:
+            ```python
+            # Get current status without polling
+            status = jenkins.get_build_status("my-job", 42)
+
+            # Poll until completion with custom timeout
+            status = jenkins.get_build_status("my-job", 42, poll=True, timeout=300)
+            ```
         """
         job_name = job_name or self.job_name
 
         if not build_number:
             raise ValueError("Build number is required")
 
+        start_time = time.time()
+        last_status = None
+
         try:
-            build_info = self._get_build_info(job_name, build_number)
+            while True:
+                try:
+                    build_info = self._get_build_info(job_name, build_number)
 
-            # Map Jenkins status to PipelineStatus
-            jenkins_status = build_info.get("result", "UNKNOWN").lower()
-            building = build_info.get("building", False)
+                    # Map Jenkins status to PipelineStatus
+                    jenkins_status = build_info.get("result", "UNKNOWN").lower()
+                    building = build_info.get("building", False)
 
-            if building:
-                pipeline_status = PipelineStatus.RUNNING
-            else:
-                pipeline_status = self._map_status(jenkins_status)
+                    if building:
+                        pipeline_status = PipelineStatus.RUNNING
+                        jenkins_status = "running"
+                    else:
+                        pipeline_status = self._map_status(jenkins_status)
 
-            return {
-                "status": pipeline_status,
-                "jenkins_status": jenkins_status,
-                "result": build_info.get("result"),
-                "building": building,
-                "timestamp": build_info.get("timestamp"),
-                "duration": build_info.get("duration"),
-                "url": build_info.get("url"),
-                "full_display_name": build_info.get("fullDisplayName"),
-                "number": build_info.get("number"),
-            }
+                    # Build status dictionary
+                    status_info = {
+                        "status": pipeline_status,
+                        "jenkins_status": jenkins_status,
+                        "result": build_info.get("result"),
+                        "building": building,
+                        "timestamp": build_info.get("timestamp"),
+                        "duration": build_info.get("duration"),
+                        "url": build_info.get("url"),
+                        "full_display_name": build_info.get("fullDisplayName"),
+                        "number": build_info.get("number"),
+                    }
 
-        except ValueError as e:
-            logger.error(f"Failed to get build status: {e}")
+                    # Log status change if polling
+                    if poll and last_status != pipeline_status:
+                        logger.info(
+                            f"Build {job_name} #{build_number} status: {pipeline_status.name} "
+                            f"(Jenkins: {jenkins_status})"
+                        )
+                        last_status = pipeline_status
+
+                    # If not polling or build is complete, return status
+                    if not poll or pipeline_status in [
+                        PipelineStatus.SUCCESS,
+                        PipelineStatus.FAILED,
+                        PipelineStatus.CANCELLED
+                    ]:
+                        # Update run in active runs if present
+                        run_id = str(build_number)
+                        with self.lock:
+                            if run_id in self.active_runs:
+                                self.active_runs[run_id].status = pipeline_status
+                                self.active_runs[run_id].updated_at = time.time()
+
+                        return status_info
+
+                    # Check timeout
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise TimeoutError(
+                            f"Build {job_name} #{build_number} did not complete within {timeout} seconds. "
+                            f"Last status: {pipeline_status.name}"
+                        )
+
+                    # Wait before next poll
+                    time.sleep(interval)
+
+                except ValueError as e:
+                    logger.error(f"Failed to get build status: {e}")
+                    raise
+                except requests.exceptions.RequestException as e:
+                    # Retry on network errors during polling
+                    if not poll:
+                        raise ConnectionError(f"Failed to get build status: {e}")
+
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise TimeoutError(
+                            f"Network errors persisted for {timeout} seconds while polling build {build_number}"
+                        )
+
+                    logger.warning(f"Network error during polling, retrying: {e}")
+                    time.sleep(interval)
+
+        except (ValueError, ConnectionError, TimeoutError):
             raise
         except Exception as e:
             logger.error(f"Error getting build status: {e}")
