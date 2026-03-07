@@ -7,12 +7,24 @@ DevFlow - 文档生成器
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Callable
 from dataclasses import dataclass, asdict
+from enum import Enum
+import time
 
 from devflow.docs.analyzer import DocumentationAnalyzer
 from devflow.docs.generator import DocumentationGenerator
 from devflow.docs.metrics import DocumentationMetrics
+
+
+class DocWorkflowStatus(Enum):
+    """Status of the documentation generation workflow."""
+    IDLE = "idle"
+    ANALYZING = "analyzing"
+    GENERATING = "generating"
+    VALIDATING = "validating"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass
@@ -30,6 +42,8 @@ class DocGenerationResult:
     """文档生成结果"""
     success: bool
     files_generated: List[str]
+    status: DocWorkflowStatus
+    duration: float
     metrics: Optional[Dict] = None
     errors: List[str] = None
     generated_at: str = None
@@ -85,6 +99,18 @@ class DocumentationGeneratorAgent:
         # 任务输出目录
         self.tasks_dir = self.project_path / '.devflow' / 'tasks'
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
+
+        # 回调函数列表
+        self._callbacks: List[Callable[[DocGenerationResult], None]] = []
+
+    def add_callback(self, callback: Callable[[DocGenerationResult], None]):
+        """
+        添加回调函数，在文档生成完成后调用
+
+        Args:
+            callback: 回调函数，接收 DocGenerationResult 参数
+        """
+        self._callbacks.append(callback)
 
     def analyze_codebase(self, path: str = None) -> Dict:
         """
@@ -280,7 +306,7 @@ class DocumentationGeneratorAgent:
 
     def run_generation_workflow(self, request: DocGenerationRequest) -> DocGenerationResult:
         """
-        运行文档生成工作流
+        运行文档生成工作流 (analyze → generate → validate)
 
         Args:
             request: 文档生成请求
@@ -288,6 +314,8 @@ class DocumentationGeneratorAgent:
         Returns:
             文档生成结果
         """
+        start_time = time.time()
+
         print("🚀 开始文档生成工作流...")
         print(f"  📂 源路径: {request.source_path}")
         print(f"  📄 输出路径: {request.output_path}")
@@ -296,12 +324,117 @@ class DocumentationGeneratorAgent:
         generated_files = []
         errors = []
         metrics = {}
+        analysis_results = {}
 
         try:
-            # 1. 分析代码
-            analysis = self.analyze_codebase(request.source_path)
+            # Phase 1: Analyze
+            print(f"\n📖 Phase 1: Analyzing codebase...")
+            analysis_results = self._analyze_phase(request)
 
-            # 2. 生成各种类型的文档
+            if not analysis_results:
+                return DocGenerationResult(
+                    success=False,
+                    files_generated=[],
+                    status=DocWorkflowStatus.FAILED,
+                    duration=time.time() - start_time,
+                    errors=["Analysis phase failed"]
+                )
+
+            # Phase 2: Generate
+            print(f"\n📝 Phase 2: Generating documentation...")
+            generation_results = self._generate_phase(request, analysis_results)
+
+            if generation_results['success']:
+                generated_files.extend(generation_results['files'])
+            else:
+                errors.extend(generation_results.get('errors', []))
+
+            # Phase 3: Validate
+            print(f"\n✅ Phase 3: Validating documentation...")
+            validation_results = self._validate_phase(request, generated_files)
+
+            # Calculate metrics
+            if request.generate_metrics:
+                print(f"\n📊 Calculating metrics...")
+                metrics = self._calculate_metrics(analysis_results, generated_files)
+
+            # Determine overall status
+            success = len(errors) == 0 and validation_results['valid']
+            status = DocWorkflowStatus.COMPLETED if success else DocWorkflowStatus.FAILED
+
+            print(f"\n{'✅' if success else '⚠️'}  Workflow completed!")
+            print(f"  Generated: {len(generated_files)} files")
+            print(f"  Validation: {'Passed' if validation_results['valid'] else 'Failed'}")
+            if validation_results.get('warnings'):
+                print(f"  Warnings: {len(validation_results['warnings'])}")
+
+            # Create result
+            result = DocGenerationResult(
+                success=success,
+                files_generated=generated_files,
+                status=status,
+                duration=time.time() - start_time,
+                metrics=metrics if metrics else None,
+                errors=errors if errors else None
+            )
+
+            # Notify callbacks
+            for callback in self._callbacks:
+                callback(result)
+
+            return result
+
+        except Exception as e:
+            print(f"❌ Workflow failed: {e}")
+            result = DocGenerationResult(
+                success=False,
+                files_generated=generated_files,
+                status=DocWorkflowStatus.FAILED,
+                duration=time.time() - start_time,
+                errors=[str(e)]
+            )
+
+            # Notify callbacks even on failure
+            for callback in self._callbacks:
+                callback(result)
+
+            return result
+
+    def _analyze_phase(self, request: DocGenerationRequest) -> Dict:
+        """
+        分析阶段：分析代码库
+
+        Args:
+            request: 文档生成请求
+
+        Returns:
+            分析结果字典
+        """
+        try:
+            analysis = self.analyze_codebase(request.source_path)
+            print(f"  ✓ Analyzed {analysis.get('total_functions', 0)} functions, "
+                  f"{analysis.get('total_classes', 0)} classes")
+            return analysis
+        except Exception as e:
+            print(f"  ✗ Analysis failed: {e}")
+            return {}
+
+    def _generate_phase(self, request: DocGenerationRequest,
+                       analysis_results: Dict) -> Dict:
+        """
+        生成阶段：生成各种类型的文档
+
+        Args:
+            request: 文档生成请求
+            analysis_results: 分析结果
+
+        Returns:
+            生成结果字典 {'success': bool, 'files': List[str], 'errors': List[str]}
+        """
+        generated_files = []
+        errors = []
+
+        try:
             for doc_type in request.doc_types:
                 if doc_type == 'api':
                     result = self.generate_api_documentation(
@@ -310,41 +443,129 @@ class DocumentationGeneratorAgent:
                     )
                     if result.success:
                         generated_files.extend(result.files_generated)
+                        print(f"  ✓ Generated API documentation")
                     else:
                         errors.extend(result.errors)
+                        print(f"  ✗ Failed to generate API documentation")
 
                 elif doc_type == 'readme':
                     # TODO: 实现README生成
-                    print("  ⚠️  README生成尚未实现")
-                    pass
+                    print(f"  ⚠ README generation not yet implemented")
 
                 elif doc_type == 'architecture':
                     # TODO: 实现架构图生成
-                    print("  ⚠️  架构图生成尚未实现")
-                    pass
-
-            # 3. 生成指标
-            if request.generate_metrics:
-                print("📊 计算文档指标...")
-                # TODO: 实现指标计算
-                metrics['coverage'] = '计算中...'
-
-            print(f"\n✅ 工作流完成! 生成了 {len(generated_files)} 个文件")
-
-            return DocGenerationResult(
-                success=len(errors) == 0,
-                files_generated=generated_files,
-                metrics=metrics if metrics else None,
-                errors=errors if errors else None
-            )
+                    print(f"  ⚠ Architecture documentation not yet implemented")
 
         except Exception as e:
-            print(f"❌ 工作流失败: {e}")
-            return DocGenerationResult(
-                success=False,
-                files_generated=generated_files,
-                errors=[str(e)]
+            errors.append(str(e))
+            print(f"  ✗ Generation phase failed: {e}")
+
+        return {
+            'success': len(errors) == 0,
+            'files': generated_files,
+            'errors': errors
+        }
+
+    def _validate_phase(self, request: DocGenerationRequest,
+                       generated_files: List[str]) -> Dict:
+        """
+        验证阶段：验证生成的文档
+
+        Args:
+            request: 文档生成请求
+            generated_files: 生成的文件列表
+
+        Returns:
+            验证结果字典 {'valid': bool, 'warnings': List[str]}
+        """
+        warnings = []
+        valid = True
+
+        try:
+            # Check if any files were generated
+            if not generated_files:
+                warnings.append("No documentation files were generated")
+                valid = False
+            else:
+                print(f"  ✓ Generated {len(generated_files)} documentation files")
+
+            # Validate each generated file exists and is not empty
+            for file_path in generated_files:
+                path = Path(file_path)
+                if not path.exists():
+                    warnings.append(f"Generated file does not exist: {file_path}")
+                    valid = False
+                elif path.stat().st_size == 0:
+                    warnings.append(f"Generated file is empty: {file_path}")
+                    valid = False
+
+            # Check documentation coverage
+            if len(generated_files) < len(request.doc_types):
+                missing_types = len(request.doc_types) - len(generated_files)
+                warnings.append(f"{missing_types} documentation type(s) not generated")
+
+            if valid:
+                print(f"  ✓ Validation passed")
+            else:
+                print(f"  ⚠ Validation completed with {len(warnings)} warning(s)")
+
+        except Exception as e:
+            print(f"  ✗ Validation failed: {e}")
+            valid = False
+            warnings.append(str(e))
+
+        return {
+            'valid': valid,
+            'warnings': warnings
+        }
+
+    def _calculate_metrics(self, analysis_results: Dict,
+                          generated_files: List[str]) -> Dict:
+        """
+        计算文档指标
+
+        Args:
+            analysis_results: 分析结果
+            generated_files: 生成的文件列表
+
+        Returns:
+            指标字典
+        """
+        metrics = {}
+
+        try:
+            # Coverage metrics
+            total_functions = analysis_results.get('total_functions', 0)
+            total_classes = analysis_results.get('total_classes', 0)
+            documented_functions = analysis_results.get('documented_functions', 0)
+            documented_classes = analysis_results.get('documented_classes', 0)
+
+            metrics['function_coverage'] = (
+                documented_functions / total_functions * 100
+                if total_functions > 0 else 0
             )
+            metrics['class_coverage'] = (
+                documented_classes / total_classes * 100
+                if total_classes > 0 else 0
+            )
+            metrics['total_elements'] = total_functions + total_classes
+            metrics['documented_elements'] = documented_functions + documented_classes
+
+            # Generation metrics
+            metrics['files_generated'] = len(generated_files)
+            metrics['avg_file_size'] = 0
+            if generated_files:
+                total_size = sum(Path(f).stat().st_size for f in generated_files if Path(f).exists())
+                metrics['avg_file_size'] = total_size / len(generated_files)
+
+            print(f"  ✓ Function coverage: {metrics['function_coverage']:.1f}%")
+            print(f"  ✓ Class coverage: {metrics['class_coverage']:.1f}%")
+
+        except Exception as e:
+            print(f"  ⚠ Failed to calculate metrics: {e}")
+            metrics['error'] = str(e)
+
+        return metrics
 
     def incremental_update(self, path: str = None) -> DocGenerationResult:
         """
