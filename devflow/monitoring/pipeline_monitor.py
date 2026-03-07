@@ -434,7 +434,7 @@ class PipelineMonitor:
             # Collect failure context
             context = {
                 "pipeline_id": pipeline_id,
-                "pipeline_type": pipeline.get("pipeline_type", "unknown"),
+                "pipeline_type": pipeline.get("type", "unknown"),
                 "commit_sha": pipeline.get("commit_sha", ""),
                 "branch": pipeline.get("branch", ""),
                 "error": error,
