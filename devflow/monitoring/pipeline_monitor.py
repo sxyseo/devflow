@@ -13,6 +13,7 @@ from enum import Enum
 from datetime import datetime
 
 from ..core.state_tracker import StateTracker, PipelineStatus
+from ..core.task_scheduler import TaskScheduler, TaskPriority
 
 
 class StageStatus(Enum):
@@ -66,7 +67,8 @@ class PipelineMonitor:
     - Event notifications
     """
 
-    def __init__(self, state_tracker: StateTracker, integrations: Dict[str, Any] = None):
+    def __init__(self, state_tracker: StateTracker, integrations: Dict[str, Any] = None,
+                 task_scheduler: TaskScheduler = None):
         """
         Initialize the pipeline monitor.
 
@@ -74,9 +76,11 @@ class PipelineMonitor:
             state_tracker: StateTracker instance for system state
             integrations: Dictionary of platform name to integration instance
                          (e.g., {"github": github_integration_instance})
+            task_scheduler: Optional TaskScheduler for creating investigation tasks
         """
         self.state = state_tracker
         self.integrations = integrations or {}
+        self.scheduler = task_scheduler
         self.lock = threading.Lock()
         self._running = False
         self._monitor_thread = None
@@ -84,6 +88,9 @@ class PipelineMonitor:
         # Polling configuration
         self._poll_interval = 30  # seconds between status polls
         self._health_check_interval = 60  # seconds between health checks
+
+        # Auto-investigation settings
+        self._auto_investigate = True  # Automatically create investigation tasks on failure
 
         # Callbacks for pipeline events
         self._on_pipeline_start: Optional[Callable] = None
@@ -246,25 +253,32 @@ class PipelineMonitor:
             except Exception as e:
                 pass
 
-    def fail_pipeline(self, pipeline_id: str, error: str):
+    def fail_pipeline(self, pipeline_id: str, error: str, auto_investigate: bool = None):
         """
         Mark a pipeline as failed.
 
         Args:
             pipeline_id: Pipeline identifier
             error: Error message or details
+            auto_investigate: Override auto-investigation setting for this failure
         """
+        # Update pipeline status
         self.state.update_pipeline_status(
             pipeline_id,
             PipelineStatus.FAILED,
             error=error,
         )
 
+        # Create investigation task if enabled
+        should_investigate = auto_investigate if auto_investigate is not None else self._auto_investigate
+        if should_investigate and self.scheduler:
+            self._create_investigation_task(pipeline_id, error)
+
         # Trigger callback if set
         if self._on_pipeline_fail:
             try:
                 self._on_pipeline_fail(pipeline_id, error)
-            except Exception as e:
+            except Exception:
                 pass
 
     def start_stage(self, pipeline_id: str, stage_name: str):
@@ -399,6 +413,77 @@ class PipelineMonitor:
                 PipelineStatus(pipeline["status"]),
                 stages=stages,
             )
+
+    def _create_investigation_task(self, pipeline_id: str, error: str):
+        """
+        Create an investigation task for a failed pipeline.
+
+        Args:
+            pipeline_id: Pipeline identifier
+            error: Error message
+        """
+        if not self.scheduler:
+            return
+
+        try:
+            # Get pipeline details for context
+            pipeline = self.state.get_pipeline_status(pipeline_id)
+            if not pipeline:
+                return
+
+            # Collect failure context
+            context = {
+                "pipeline_id": pipeline_id,
+                "pipeline_type": pipeline.get("pipeline_type", "unknown"),
+                "commit_sha": pipeline.get("commit_sha", ""),
+                "branch": pipeline.get("branch", ""),
+                "error": error,
+                "failed_stages": [],
+            }
+
+            # Find failed stages
+            for stage in pipeline.get("stages", []):
+                if stage.get("status") == StageStatus.FAILED.value:
+                    context["failed_stages"].append({
+                        "name": stage.get("name"),
+                        "error": stage.get("error"),
+                        "logs": stage.get("logs", []),
+                    })
+
+            # Create investigation task
+            task_id = self.scheduler.create_task(
+                task_type="investigation",
+                description=f"Investigate pipeline failure: {pipeline_id}",
+                agent_type="investigator",
+                priority=TaskPriority.HIGH.value,
+                input_data={
+                    "failure_context": context,
+                    "pipeline_id": pipeline_id,
+                    "investigation_type": "pipeline_failure",
+                },
+            )
+
+            # Store investigation task ID in pipeline metadata
+            metadata = pipeline.get("metadata", {})
+            metadata["investigation_task_id"] = task_id
+            self.state.update_pipeline_status(
+                pipeline_id,
+                PipelineStatus(pipeline["status"]),
+                metadata=metadata,
+            )
+
+        except Exception as e:
+            # Don't let investigation task creation break pipeline monitoring
+            pass
+
+    def set_auto_investigate(self, enabled: bool):
+        """
+        Enable or disable automatic investigation task creation.
+
+        Args:
+            enabled: Whether to auto-create investigation tasks on failure
+        """
+        self._auto_investigate = enabled
 
     def _monitor_loop(self):
         """Main monitoring loop - polls active pipelines for status updates."""
