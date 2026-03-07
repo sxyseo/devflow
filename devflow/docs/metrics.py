@@ -654,3 +654,188 @@ class DocumentationMetrics:
         # Keep only last 100 trends to avoid excessive memory usage
         if len(self.history) > 100:
             self.history = self.history[-100:]
+
+    def render_coverage_bar(self, percentage: float, width: int = 30) -> str:
+        """
+        Render a visual coverage bar.
+
+        Args:
+            percentage: Coverage percentage (0-100)
+            width: Width of the bar in characters
+
+        Returns:
+            String representation of the coverage bar
+        """
+        filled = int(width * (percentage / 100))
+        empty = width - filled
+
+        # Choose bar style based on coverage level
+        if percentage >= 80:
+            bar_char = '█'
+        elif percentage >= 50:
+            bar_char = '▓'
+        else:
+            bar_char = '▒'
+
+        bar = bar_char * filled + '░' * empty
+        return f"[{bar}] {percentage:5.1f}%"
+
+    def render_report(self, report: MetricsReport) -> str:
+        """
+        Render a metrics report as a formatted string.
+
+        Args:
+            report: MetricsReport to render
+
+        Returns:
+            Formatted string representation of the report
+        """
+        lines = []
+
+        # Header
+        lines.append("📊 Documentation Metrics Report")
+        lines.append("━" * 60)
+        lines.append(f"📁 Path: {report.codebase_path}")
+        lines.append(f"⏰ Generated: {report.timestamp}")
+        lines.append("")
+
+        # Overall scores
+        lines.append("📈 Overall Scores")
+        lines.append("─" * 40)
+
+        coverage_emoji = "✅" if report.overall_coverage >= 80 else "⚠️" if report.overall_coverage >= 50 else "❌"
+        quality_emoji = "✅" if report.overall_quality >= 80 else "⚠️" if report.overall_quality >= 50 else "❌"
+
+        lines.append(f"{coverage_emoji} Coverage:  {self.render_coverage_bar(report.overall_coverage)}")
+        lines.append(f"{quality_emoji} Quality:    {self.render_coverage_bar(report.overall_quality)}")
+        lines.append("")
+
+        # Coverage by element type
+        lines.append("📋 Coverage by Element Type")
+        lines.append("─" * 40)
+
+        for element_type, metric in sorted(report.coverage_metrics.items()):
+            emoji = "✅" if metric.coverage_percentage >= 80 else "⚠️" if metric.coverage_percentage >= 50 else "❌"
+            lines.append(
+                f"{emoji} {element_type:15s} {self.render_coverage_bar(metric.coverage_percentage)} "
+                f"({metric.documented}/{metric.total})"
+            )
+
+        lines.append("")
+
+        # Quality metrics summary
+        if report.quality_metrics:
+            lines.append("✨ Quality Metrics Summary")
+            lines.append("─" * 40)
+
+            # Count quality levels
+            high_quality = sum(1 for m in report.quality_metrics if m.overall_score >= 80)
+            medium_quality = sum(1 for m in report.quality_metrics if 50 <= m.overall_score < 80)
+            low_quality = sum(1 for m in report.quality_metrics if m.overall_score < 50)
+
+            lines.append(f"✅ High Quality (≥80%):    {high_quality}")
+            lines.append(f"⚠️  Medium Quality (50-79%): {medium_quality}")
+            lines.append(f"❌ Low Quality (<50%):      {low_quality}")
+            lines.append("")
+
+        # Metadata
+        if report.metadata:
+            lines.append("📊 Metadata")
+            lines.append("─" * 40)
+            for key, value in sorted(report.metadata.items()):
+                lines.append(f"• {key}: {value}")
+            lines.append("")
+
+        # Recommendations
+        if report.recommendations:
+            lines.append("💡 Recommendations")
+            lines.append("─" * 40)
+            for i, rec in enumerate(report.recommendations, 1):
+                lines.append(f"{i}. {rec}")
+            lines.append("")
+
+        # Footer
+        lines.append("━" * 60)
+
+        return '\n'.join(lines)
+
+    def render_trends(self, limit: int = 10) -> str:
+        """
+        Render metrics trends as a formatted table.
+
+        Args:
+            limit: Maximum number of trend records to display
+
+        Returns:
+            Formatted string representation of trends
+        """
+        trends = self.get_trends(limit)
+
+        if not trends:
+            return "📊 No trend data available yet."
+
+        lines = []
+
+        # Header
+        lines.append("📈 Metrics Trends Over Time")
+        lines.append("━" * 80)
+        lines.append("")
+
+        # Table header
+        lines.append(
+            f"{'Timestamp':<25} {'Coverage':<15} {'Quality':<15} {'Elements':<15}"
+        )
+        lines.append("─" * 80)
+
+        # Table rows
+        for trend in reversed(trends):  # Show oldest first
+            timestamp = trend.timestamp[:19]  # Truncate microseconds
+            coverage_bar = self.render_coverage_bar(trend.coverage_percentage, width=12)
+            quality_bar = self.render_coverage_bar(trend.quality_score, width=12)
+            elements = f"{trend.documented_elements}/{trend.total_elements}"
+
+            lines.append(
+                f"{timestamp:<25} {coverage_bar:<15} {quality_bar:<15} {elements:<15}"
+            )
+
+        lines.append("")
+
+        # Calculate trends
+        if len(trends) > 1:
+            oldest = trends[-1]
+            newest = trends[0]
+
+            coverage_delta = newest.coverage_percentage - oldest.coverage_percentage
+            quality_delta = newest.quality_score - oldest.quality_score
+
+            lines.append("📊 Change Analysis")
+            lines.append("─" * 40)
+
+            coverage_emoji = "📈" if coverage_delta > 0 else "📉" if coverage_delta < 0 else "➡️"
+            quality_emoji = "📈" if quality_delta > 0 else "📉" if quality_delta < 0 else "➡️"
+
+            lines.append(f"{coverage_emoji} Coverage Change:  {coverage_delta:+.1f}%")
+            lines.append(f"{quality_emoji} Quality Change:   {quality_delta:+.1f}%")
+            lines.append("")
+
+        lines.append("━" * 80)
+
+        return '\n'.join(lines)
+
+    def print_report(self, report: MetricsReport) -> None:
+        """
+        Print a formatted metrics report to stdout.
+
+        Args:
+            report: MetricsReport to print
+        """
+        print(self.render_report(report))
+
+    def print_trends(self, limit: int = 10) -> None:
+        """
+        Print formatted metrics trends to stdout.
+
+        Args:
+            limit: Maximum number of trend records to display
+        """
+        print(self.render_trends(limit))
