@@ -6,8 +6,10 @@ to reduce API usage and costs.
 """
 
 from .base import CacheBackend, CacheEntry
+from .response_cache import ResponseCache
 
 __all__ = [
     'CacheBackend',
     'CacheEntry',
+    'ResponseCache',
 ]
