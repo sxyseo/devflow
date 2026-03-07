@@ -55,6 +55,15 @@ class Settings:
         self.metrics_port = int(os.getenv("METRICS_PORT", "9090"))
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
 
+        # CI/CD Settings
+        self.github_token = os.getenv("GITHUB_TOKEN", "")
+        self.github_repo = os.getenv("GITHUB_REPO", "")
+        self.github_base_url = os.getenv("GITHUB_BASE_URL", "https://api.github.com")
+        self.ci_timeout = int(os.getenv("CI_TIMEOUT", "3600"))  # 1 hour
+        self.enable_auto_deploy = os.getenv("ENABLE_AUTO_DEPLOY", "false").lower() == "true"
+        self.deploy_branch = os.getenv("DEPLOY_BRANCH", "main")
+        self.require_ci_success = True
+
         # BMAD Workflow Settings
         self.bmad_agents = [
             "product-owner",
@@ -113,6 +122,13 @@ class Settings:
             "enable_metrics": self.enable_metrics,
             "metrics_port": self.metrics_port,
             "log_level": self.log_level,
+            "github_token": self.github_token,
+            "github_repo": self.github_repo,
+            "github_base_url": self.github_base_url,
+            "ci_timeout": self.ci_timeout,
+            "enable_auto_deploy": self.enable_auto_deploy,
+            "deploy_branch": self.deploy_branch,
+            "require_ci_success": self.require_ci_success,
             "bmad_agents": self.bmad_agents,
         }
 
