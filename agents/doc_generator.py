@@ -13,7 +13,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import time
 
-from devflow.docs.analyzer import DocumentationAnalyzer, CodeChange, ChangeType
+from devflow.docs.analyzer import DocumentationAnalyzer, CodeChange, ChangeType, DocumentationType
 from devflow.docs.generator import DocumentationGenerator
 from devflow.docs.metrics import DocumentationMetrics
 
@@ -431,6 +431,8 @@ class DocumentationGeneratorAgent:
             return DocGenerationResult(
                 success=True,
                 files_generated=[output_path],
+                status=DocWorkflowStatus.COMPLETED,
+                duration=0.0,
                 metrics={
                     'total_functions': analysis.get('total_functions', 0),
                     'total_classes': analysis.get('total_classes', 0)
@@ -442,6 +444,8 @@ class DocumentationGeneratorAgent:
             return DocGenerationResult(
                 success=False,
                 files_generated=[],
+                status=DocWorkflowStatus.FAILED,
+                duration=0.0,
                 errors=[str(e)]
             )
 
