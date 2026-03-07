@@ -17,6 +17,7 @@ from .state_tracker import StateTracker, AgentStatus, TaskStatus
 from .session_manager import SessionManager
 from .agent_manager import AgentManager
 from .task_scheduler import TaskScheduler, Task, TaskPriority
+from ..docs.generator import DocumentationGenerator
 from ..config.settings import settings
 
 
@@ -44,6 +45,7 @@ class Orchestrator:
         self.sessions = SessionManager()
         self.agents = AgentManager(self.state, self.sessions)
         self.scheduler = TaskScheduler(self.state, self.agents)
+        self.docs_generator = DocumentationGenerator()
 
         # Control flags
         self._running = False
