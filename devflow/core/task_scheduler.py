@@ -88,6 +88,8 @@ class TaskScheduler:
         self.lock = threading.Lock()
         self._running = False
         self._scheduler_thread = None
+        self._task_sources: Dict[str, Any] = {}
+        self._task_source_threads: Dict[str, threading.Thread] = {}
 
     def start(self):
         """Start the task scheduler."""
@@ -104,6 +106,112 @@ class TaskScheduler:
         if self._scheduler_thread:
             self._scheduler_thread.join(timeout=5)
             self._scheduler_thread = None
+
+        # Stop all task source polling threads
+        for source_name in list(self._task_source_threads.keys()):
+            self.unregister_task_source(source_name)
+
+    def register_task_source(self, source_name: str, fetch_callback: callable,
+                            polling_interval: int = 60) -> None:
+        """
+        Register a task source plugin.
+
+        Task source plugins can register themselves to provide custom
+        sources of tasks. The scheduler will periodically call the
+        fetch_callback to get new tasks from the source.
+
+        Args:
+            source_name: Unique name for the task source
+            fetch_callback: Callable that returns a list of tasks
+            polling_interval: Seconds between polling attempts
+        """
+        with self.lock:
+            if source_name in self._task_sources:
+                return
+
+            self._task_sources[source_name] = {
+                'callback': fetch_callback,
+                'interval': polling_interval,
+                'enabled': True
+            }
+
+            # Start polling thread for this source
+            self._start_task_source_polling(source_name)
+
+    def unregister_task_source(self, source_name: str) -> bool:
+        """
+        Unregister a task source plugin.
+
+        Args:
+            source_name: Name of the task source to unregister
+
+        Returns:
+            True if source was unregistered, False if not found
+        """
+        with self.lock:
+            if source_name not in self._task_sources:
+                return False
+
+            # Stop polling thread
+            if source_name in self._task_source_threads:
+                thread = self._task_source_threads[source_name]
+                del self._task_source_threads[source_name]
+                # Thread is daemon and will exit on its own
+
+            # Remove source
+            del self._task_sources[source_name]
+            return True
+
+    def _start_task_source_polling(self, source_name: str) -> None:
+        """
+        Start a polling thread for a task source.
+
+        Args:
+            source_name: Name of the task source
+        """
+        if source_name in self._task_source_threads:
+            return
+
+        thread = threading.Thread(
+            target=self._task_source_polling_loop,
+            args=(source_name,),
+            daemon=True,
+            name=f"task-source-{source_name}"
+        )
+        self._task_source_threads[source_name] = thread
+        thread.start()
+
+    def _task_source_polling_loop(self, source_name: str) -> None:
+        """
+        Polling loop for a task source.
+
+        Args:
+            source_name: Name of the task source
+        """
+        while self._running and source_name in self._task_sources:
+            try:
+                source_info = self._task_sources.get(source_name)
+                if not source_info or not source_info.get('enabled'):
+                    break
+
+                # Call the fetch callback
+                fetch_callback = source_info.get('callback')
+                if fetch_callback:
+                    try:
+                        fetch_callback()
+                    except Exception as e:
+                        print(f"Task source {source_name} error: {e}")
+
+                # Wait for next interval
+                interval = source_info.get('interval', 60)
+                for _ in range(interval):
+                    if not self._running or source_name not in self._task_sources:
+                        break
+                    time.sleep(1)
+
+            except Exception as e:
+                print(f"Task source polling error for {source_name}: {e}")
+                time.sleep(10)
 
     def create_task(self, task_type: str, description: str, agent_type: str,
                    priority: int = TaskPriority.MEDIUM.value,
