@@ -1,0 +1,24 @@
+{
+  "created_at": "2026-03-07T23:44:24.750609",
+  "total_tasks": 2,
+  "tasks": [
+    {
+      "task_id": "doc-task-1",
+      "type": "update-api",
+      "file_path": "docs/api.md",
+      "priority": "P1",
+      "reason": "发现 18 个未文档化的函数",
+      "suggested_action": "为未文档化的函数添加docstring或生成API文档",
+      "created_at": "2026-03-07T23:44:24.748806"
+    },
+    {
+      "task_id": "doc-task-2",
+      "type": "update-api",
+      "file_path": "docs/api.md",
+      "priority": "P1",
+      "reason": "发现 51 个未文档化的类",
+      "suggested_action": "为未文档化的类添加docstring或生成API文档",
+      "created_at": "2026-03-07T23:44:24.748821"
+    }
+  ]
+}
