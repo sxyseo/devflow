@@ -66,17 +66,24 @@ class PipelineMonitor:
     - Event notifications
     """
 
-    def __init__(self, state_tracker: StateTracker):
+    def __init__(self, state_tracker: StateTracker, integrations: Dict[str, Any] = None):
         """
         Initialize the pipeline monitor.
 
         Args:
             state_tracker: StateTracker instance for system state
+            integrations: Dictionary of platform name to integration instance
+                         (e.g., {"github": github_integration_instance})
         """
         self.state = state_tracker
+        self.integrations = integrations or {}
         self.lock = threading.Lock()
         self._running = False
         self._monitor_thread = None
+
+        # Polling configuration
+        self._poll_interval = 30  # seconds between status polls
+        self._health_check_interval = 60  # seconds between health checks
 
         # Callbacks for pipeline events
         self._on_pipeline_start: Optional[Callable] = None
@@ -85,14 +92,40 @@ class PipelineMonitor:
         self._on_stage_start: Optional[Callable] = None
         self._on_stage_complete: Optional[Callable] = None
 
-    def start(self):
-        """Start the pipeline monitor."""
+    def start(self, poll_interval: int = 30):
+        """
+        Start the pipeline monitor.
+
+        Args:
+            poll_interval: Seconds between status polls (default: 30)
+        """
         if self._running:
             return
 
+        self._poll_interval = poll_interval
         self._running = True
         self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._monitor_thread.start()
+
+    def register_integration(self, platform: str, integration: Any):
+        """
+        Register a CI/CD platform integration.
+
+        Args:
+            platform: Platform name (e.g., "github", "gitlab", "jenkins")
+            integration: Integration instance
+        """
+        self.integrations[platform] = integration
+
+    def unregister_integration(self, platform: str):
+        """
+        Unregister a CI/CD platform integration.
+
+        Args:
+            platform: Platform name to remove
+        """
+        if platform in self.integrations:
+            del self.integrations[platform]
 
     def stop(self):
         """Stop the pipeline monitor."""
@@ -104,7 +137,9 @@ class PipelineMonitor:
     def track_pipeline(self, pipeline_id: str, pipeline_type: str,
                       commit_sha: str, branch: str,
                       stages: List[Dict[str, Any]] = None,
-                      triggered_by: str = None) -> str:
+                      triggered_by: str = None,
+                      platform: str = None,
+                      run_id: str = None) -> str:
         """
         Start tracking a new pipeline.
 
@@ -115,6 +150,8 @@ class PipelineMonitor:
             branch: Git branch name
             stages: List of stage definitions
             triggered_by: User or system that triggered the pipeline
+            platform: CI/CD platform name (e.g., "github", "gitlab")
+            run_id: External pipeline run ID for polling
 
         Returns:
             Pipeline ID
@@ -127,6 +164,20 @@ class PipelineMonitor:
             branch=branch,
             triggered_by=triggered_by,
         )
+
+        # Store platform and run_id in metadata for polling
+        if platform or run_id:
+            metadata = {}
+            if platform:
+                metadata["platform"] = platform
+            if run_id:
+                metadata["run_id"] = run_id
+
+            self.state.update_pipeline_status(
+                pipeline_id,
+                PipelineStatus.PENDING,
+                metadata=metadata,
+            )
 
         # Initialize stages if provided
         if stages:
@@ -350,18 +401,178 @@ class PipelineMonitor:
             )
 
     def _monitor_loop(self):
-        """Main monitoring loop."""
+        """Main monitoring loop - polls active pipelines for status updates."""
+        health_check_counter = 0
+
         while self._running:
             try:
-                # Check for stalled or timed-out pipelines
-                self._check_pipeline_health()
+                # Poll active pipelines for status updates
+                self._poll_active_pipelines()
 
-                # Sleep before next check
-                time.sleep(5)
+                # Periodic health checks (less frequent than polling)
+                health_check_counter += 1
+                if health_check_counter >= (self._health_check_interval // self._poll_interval):
+                    self._check_pipeline_health()
+                    health_check_counter = 0
+
+                # Sleep before next poll
+                time.sleep(self._poll_interval)
 
             except Exception as e:
                 # Log error but continue monitoring
-                time.sleep(5)
+                time.sleep(self._poll_interval)
+
+    def _poll_active_pipelines(self):
+        """
+        Poll all active pipelines to update their status.
+
+        This method:
+        1. Gets all pipelines from state tracker
+        2. Filters for active (non-terminal) pipelines
+        3. For each pipeline with an integration, polls for current status
+        4. Updates state tracker with new status
+        5. Triggers callbacks on status changes
+        """
+        pipelines = self.state.get_all_pipelines()
+
+        for pipeline_id, pipeline in pipelines.items():
+            try:
+                status = pipeline.get("status")
+
+                # Skip completed/failed/cancelled pipelines
+                if status in [
+                    PipelineStatus.COMPLETED.value,
+                    PipelineStatus.FAILED.value,
+                    PipelineStatus.CANCELLED.value,
+                ]:
+                    continue
+
+                # Get integration for this pipeline
+                integration = self._get_pipeline_integration(pipeline)
+                if not integration:
+                    continue
+
+                # Get external run ID from metadata
+                run_id = pipeline.get("metadata", {}).get("run_id")
+                if not run_id:
+                    continue
+
+                # Poll integration for current status
+                try:
+                    current_status = integration.get_pipeline_status(run_id)
+
+                    # Map integration status to state tracker status
+                    new_status = self._map_integration_status(current_status)
+
+                    # Update if status changed
+                    if new_status != status:
+                        self._update_pipeline_status_from_poll(
+                            pipeline_id, pipeline, new_status, current_status
+                        )
+
+                except Exception as e:
+                    # Log error but don't stop monitoring other pipelines
+                    pass
+
+            except Exception as e:
+                # Log error but continue monitoring other pipelines
+                pass
+
+    def _get_pipeline_integration(self, pipeline: Dict[str, Any]) -> Optional[Any]:
+        """
+        Get the integration instance for a pipeline.
+
+        Args:
+            pipeline: Pipeline dictionary from state tracker
+
+        Returns:
+            Integration instance or None
+        """
+        # Get platform from pipeline metadata
+        platform = pipeline.get("metadata", {}).get("platform")
+        if not platform:
+            return None
+
+        return self.integrations.get(platform)
+
+    def _map_integration_status(self, integration_status) -> PipelineStatus:
+        """
+        Map integration-specific status to PipelineStatus enum.
+
+        Args:
+            integration_status: Status from integration (can be enum or string)
+
+        Returns:
+            PipelineStatus enum value
+        """
+        # Handle if integration returns string
+        if isinstance(integration_status, str):
+            status_map = {
+                "pending": PipelineStatus.PENDING,
+                "queued": PipelineStatus.PENDING,
+                "running": PipelineStatus.RUNNING,
+                "success": PipelineStatus.COMPLETED,
+                "completed": PipelineStatus.COMPLETED,
+                "failed": PipelineStatus.FAILED,
+                "failure": PipelineStatus.FAILED,
+                "cancelled": PipelineStatus.FAILED,
+                "canceled": PipelineStatus.FAILED,
+            }
+            return status_map.get(integration_status.lower(), PipelineStatus.RUNNING)
+
+        # Handle if integration returns PipelineStatus enum
+        if hasattr(integration_status, "value"):
+            # Map integration status to our status
+            value = integration_status.value
+            if value in ["success", "completed"]:
+                return PipelineStatus.COMPLETED
+            elif value in ["failed", "failure"]:
+                return PipelineStatus.FAILED
+            elif value == "cancelled":
+                return PipelineStatus.FAILED
+            elif value == "running":
+                return PipelineStatus.RUNNING
+            else:
+                return PipelineStatus.RUNNING
+
+        return PipelineStatus.RUNNING
+
+    def _update_pipeline_status_from_poll(
+        self,
+        pipeline_id: str,
+        pipeline: Dict[str, Any],
+        new_status: PipelineStatus,
+        integration_status
+    ):
+        """
+        Update pipeline status based on poll results and trigger callbacks.
+
+        Args:
+            pipeline_id: Pipeline identifier
+            pipeline: Pipeline dictionary
+            new_status: New PipelineStatus enum value
+            integration_status: Original status from integration
+        """
+        old_status = pipeline.get("status")
+
+        # Update in state tracker
+        self.state.update_pipeline_status(pipeline_id, new_status)
+
+        # Trigger appropriate callbacks
+        if new_status == PipelineStatus.COMPLETED:
+            if self._on_pipeline_complete:
+                try:
+                    self._on_pipeline_complete(pipeline_id, {"status": str(integration_status)})
+                except Exception:
+                    pass
+
+        elif new_status == PipelineStatus.FAILED:
+            if self._on_pipeline_fail:
+                try:
+                    error_msg = getattr(integration_status, "value", str(integration_status))
+                    self._on_pipeline_fail(pipeline_id, error_msg)
+                except Exception:
+                    pass
 
     def _check_pipeline_health(self):
         """Check health of running pipelines."""

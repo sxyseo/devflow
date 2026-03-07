@@ -228,12 +228,14 @@ class StateTracker:
                 "stages": [],
                 "result": None,
                 "error": None,
+                "metadata": {},
             }
             self.save()
 
     def update_pipeline_status(self, pipeline_id: str, status: PipelineStatus,
                               stages: List[Dict[str, Any]] = None,
-                              result: Any = None, error: str = None):
+                              result: Any = None, error: str = None,
+                              metadata: Dict[str, Any] = None):
         """Update pipeline status."""
         with self.lock:
             if pipeline_id not in self.pipelines:
@@ -257,6 +259,9 @@ class StateTracker:
 
             if error is not None:
                 pipeline["error"] = error
+
+            if metadata is not None:
+                pipeline["metadata"].update(metadata)
 
             self.save()
 
