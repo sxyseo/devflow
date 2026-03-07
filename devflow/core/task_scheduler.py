@@ -25,6 +25,25 @@ class TaskPriority(Enum):
     DEFERRED = 5
 
 
+class TaskType(Enum):
+    """Task types supported by the scheduler."""
+    # Planning tasks
+    PLANNING = "planning"
+
+    # Development tasks
+    DEVELOPMENT = "development"
+
+    # Quality assurance tasks
+    QUALITY = "quality"
+
+    # CI/CD tasks
+    TRIGGER_PIPELINE = "trigger-pipeline"
+    MONITOR_PIPELINE = "monitor-pipeline"
+
+    # Investigation tasks
+    INVESTIGATION = "investigation"
+
+
 @dataclass
 class Task:
     """A task to be executed by an agent."""
@@ -79,6 +98,14 @@ class TaskScheduler:
     - Agent assignment
     - Retry logic
     - Timeout handling
+
+    Supported Task Types:
+    - planning: Project planning and requirement gathering
+    - development: Code implementation tasks
+    - quality: Quality assurance, testing, and review
+    - trigger-pipeline: CI/CD pipeline triggering
+    - monitor-pipeline: CI/CD pipeline monitoring
+    - investigation: Failure investigation and analysis
     """
 
     def __init__(self, state_tracker: StateTracker, agent_manager: AgentManager):
