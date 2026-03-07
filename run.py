@@ -14,6 +14,7 @@ Commands:
     status          Show system status
     list-agents     List all agents
     list-tasks      List all tasks
+    generate-docs   Generate documentation
     cleanup         Cleanup resources
     help            Show this help message
 
@@ -30,6 +31,11 @@ Examples:
     # Check status
     python run.py status
 
+    # Generate documentation
+    python run.py generate-docs
+    python run.py generate-docs --incremental
+    python run.py generate-docs --path ./devflow --output docs --types api
+
     # Cleanup
     python run.py cleanup
 """
@@ -44,6 +50,7 @@ sys.path.insert(0, str(project_root))
 
 from devflow.core.orchestrator import get_orchestrator
 from devflow.config.settings import settings
+from agents.doc_generator import DocumentationGeneratorAgent, DocGenerationRequest
 
 
 def cmd_start(args):
@@ -205,6 +212,69 @@ def cmd_cleanup(args):
     print("\n✓ Cleanup complete!\n")
 
 
+def cmd_generate_docs(args):
+    """Generate documentation."""
+    agent = DocumentationGeneratorAgent()
+
+    if args.incremental:
+        # Incremental update
+        force = args.force if hasattr(args, 'force') and args.force else False
+        result = agent.incremental_update(force=force)
+
+        if result.success:
+            print(f"\n✓ Documentation update completed successfully!")
+            if result.files_generated:
+                print(f"Generated files: {', '.join(result.files_generated)}")
+            else:
+                print("No changes detected - documentation is up to date.")
+            if result.metrics:
+                print(f"Metrics: {result.metrics}")
+        else:
+            print(f"\n✗ Documentation update failed")
+            if result.errors:
+                for error in result.errors:
+                    print(f"  - {error}")
+    else:
+        # Full generation workflow
+        source_path = args.path if hasattr(args, 'path') and args.path else '.'
+        output_path = args.output if hasattr(args, 'output') and args.output else 'docs'
+
+        # Determine doc types
+        doc_types = ['api']  # Default to API docs
+        if hasattr(args, 'types') and args.types:
+            doc_types = args.types.split(',')
+
+        request = DocGenerationRequest(
+            source_path=source_path,
+            output_path=output_path,
+            doc_types=doc_types,
+            force_update=args.force if hasattr(args, 'force') and args.force else False,
+            generate_metrics=True
+        )
+
+        result = agent.run_generation_workflow(request)
+
+        if result.success:
+            print(f"\n✓ Documentation generated successfully!")
+            print(f"Generated files: {len(result.files_generated)}")
+            for f in result.files_generated:
+                print(f"  - {f}")
+            if result.metrics:
+                print(f"\nMetrics:")
+                for key, value in result.metrics.items():
+                    if isinstance(value, float):
+                        print(f"  {key}: {value:.1f}")
+                    else:
+                        print(f"  {key}: {value}")
+        else:
+            print(f"\n✗ Documentation generation failed")
+            if result.errors:
+                for error in result.errors:
+                    print(f"  - {error}")
+
+    print()
+
+
 def cmd_help(args):
     """Show help message."""
     print(__doc__)
@@ -242,6 +312,14 @@ def main():
     list_tasks_parser = subparsers.add_parser('list-tasks', help='List all tasks')
     list_tasks_parser.add_argument('--status', help='Filter by status')
 
+    # generate-docs command
+    generate_docs_parser = subparsers.add_parser('generate-docs', help='Generate documentation')
+    generate_docs_parser.add_argument('--path', help='Source path to analyze (default: current directory)')
+    generate_docs_parser.add_argument('--output', help='Output directory (default: docs)')
+    generate_docs_parser.add_argument('--types', help='Document types to generate (comma-separated: api,readme,architecture)')
+    generate_docs_parser.add_argument('--incremental', action='store_true', help='Run incremental update (only update changed files)')
+    generate_docs_parser.add_argument('--force', action='store_true', help='Force regeneration of all documentation')
+
     # cleanup command
     subparsers.add_parser('cleanup', help='Cleanup resources')
 
@@ -262,6 +340,7 @@ def main():
         'status': cmd_status,
         'list-agents': cmd_list_agents,
         'list-tasks': cmd_list_tasks,
+        'generate-docs': cmd_generate_docs,
         'cleanup': cmd_cleanup,
         'help': cmd_help,
     }
