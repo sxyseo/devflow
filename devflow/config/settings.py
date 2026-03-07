@@ -19,6 +19,7 @@ class Settings:
         self.workspace_dir = self.project_root / ".openclaw" / "workspace"
         self.agents_dir = self.project_root / ".openclaw" / "agents"
         self.skills_dir = self.project_root / "skills"
+        self.plugins_dir = self.project_root / "plugins"
         self.docs_dir = self.project_root / "docs"
         self.logs_dir = self.project_root / ".devflow" / "logs"
         self.state_dir = self.project_root / ".devflow" / "state"
@@ -76,6 +77,7 @@ class Settings:
         dirs = [
             self.workspace_dir,
             self.agents_dir,
+            self.plugins_dir,
             self.logs_dir,
             self.state_dir,
             self.worktrees_dir,
@@ -91,6 +93,7 @@ class Settings:
             "workspace_dir": str(self.workspace_dir),
             "agents_dir": str(self.agents_dir),
             "skills_dir": str(self.skills_dir),
+            "plugins_dir": str(self.plugins_dir),
             "docs_dir": str(self.docs_dir),
             "logs_dir": str(self.logs_dir),
             "state_dir": str(self.state_dir),
