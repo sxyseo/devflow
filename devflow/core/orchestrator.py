@@ -19,6 +19,8 @@ from .agent_manager import AgentManager
 from .task_scheduler import TaskScheduler, Task, TaskPriority
 from ..monitoring.pipeline_monitor import PipelineMonitor
 from ..config.settings import settings
+from ..integrations.base import PipelineConfig, PipelineStatus
+from ..integrations.github_actions import GitHubActions
 
 
 class Orchestrator:
@@ -47,6 +49,10 @@ class Orchestrator:
         self.scheduler = TaskScheduler(self.state, self.agents)
         self.pipeline_monitor = PipelineMonitor(self.state, task_scheduler=self.scheduler)
 
+        # CI/CD Integrations
+        self.ci_integrations: Dict[str, Any] = {}
+        self._auto_trigger_pipelines = settings.enable_auto_deploy
+
         # Control flags
         self._running = False
         self._shutdown_event = threading.Event()
@@ -61,6 +67,41 @@ class Orchestrator:
         self.stop()
         sys.exit(0)
 
+    def _initialize_ci_integrations(self):
+        """
+        Initialize CI/CD integrations based on settings.
+
+        This method sets up GitHub Actions, GitLab CI, and Jenkins integrations
+        if the required configuration is available.
+        """
+        # GitHub Actions integration
+        if settings.github_token and settings.github_repo:
+            try:
+                config = PipelineConfig(
+                    platform="github",
+                    enabled=True,
+                    api_token=settings.github_token,
+                    base_url=settings.github_base_url,
+                    repository=settings.github_repo,
+                    branch=settings.deploy_branch,
+                    timeout=settings.ci_timeout,
+                )
+                github_integration = GitHubActions(config)
+                self.ci_integrations["github"] = github_integration
+
+                # Register with PipelineMonitor
+                self.pipeline_monitor.register_integration("github", github_integration)
+
+                print("✓ GitHub Actions integration initialized")
+            except Exception as e:
+                print(f"⚠ Failed to initialize GitHub Actions: {e}")
+
+        # Future: Add GitLab CI and Jenkins integrations here
+        # if settings.gitlab_token and settings.gitlab_repo:
+        #     ...
+        # if settings.jenkins_url and settings.jenkins_user:
+        #     ...
+
     def start(self):
         """Start the orchestrator."""
         if self._running:
@@ -71,6 +112,9 @@ class Orchestrator:
         print("=" * 60)
 
         self._running = True
+
+        # Initialize CI/CD integrations
+        self._initialize_ci_integrations()
 
         # Start session monitoring
         self.sessions.start_monitoring()
@@ -114,6 +158,14 @@ class Orchestrator:
         # Stop pipeline monitor
         self.pipeline_monitor.stop()
         print("✓ Pipeline monitor stopped")
+
+        # Cleanup CI/CD integrations
+        for platform, integration in self.ci_integrations.items():
+            try:
+                integration.cleanup_completed_runs(max_age=0)
+            except Exception as e:
+                pass  # Silently ignore cleanup errors
+        print("✓ CI/CD integrations cleaned up")
 
         # Cleanup agents
         self.agents.cleanup_all_agents()
@@ -373,6 +425,86 @@ class Orchestrator:
 
         return workflow_id
 
+    def trigger_pipeline_after_commit(
+        self,
+        repo_path: Path,
+        branch: str,
+        commit_sha: str,
+        platform: str = None
+    ) -> Optional[str]:
+        """
+        Trigger CI/CD pipeline after a commit is made.
+
+        This method is called automatically when agents make commits to trigger
+        the appropriate CI/CD pipeline for the commit.
+
+        Args:
+            repo_path: Path to the git repository
+            branch: Git branch name
+            commit_sha: Git commit SHA
+            platform: Optional platform name (github, gitlab, jenkins).
+                     If None, will auto-detect based on available integrations.
+
+        Returns:
+            Pipeline ID if triggered successfully, None otherwise
+        """
+        if not self._auto_trigger_pipelines:
+            return None
+
+        # Determine which integration to use
+        if platform:
+            integration = self.ci_integrations.get(platform)
+        else:
+            # Auto-detect: use first available integration
+            integration = next(iter(self.ci_integrations.values()), None)
+
+        if not integration:
+            # No CI/CD integration configured
+            return None
+
+        try:
+            # Trigger the pipeline
+            pipeline_run = integration.trigger_pipeline(
+                branch=branch,
+                commit_sha=commit_sha
+            )
+
+            # Generate pipeline ID
+            pipeline_id = f"pipeline-{integration.config.platform}-{pipeline_run.run_id}"
+
+            # Track the pipeline in the monitor
+            self.pipeline_monitor.track_pipeline(
+                pipeline_id=pipeline_id,
+                pipeline_type="ci",
+                commit_sha=commit_sha,
+                branch=branch,
+                triggered_by="devflow-orchestrator",
+                platform=integration.config.platform,
+                run_id=pipeline_run.run_id
+            )
+
+            print(f"✓ Triggered CI/CD pipeline: {pipeline_id}")
+            print(f"  Platform: {integration.config.platform}")
+            print(f"  Run ID: {pipeline_run.run_id}")
+            print(f"  Branch: {branch}")
+            print(f"  Commit: {commit_sha[:8]}")
+
+            return pipeline_id
+
+        except Exception as e:
+            print(f"⚠ Failed to trigger CI/CD pipeline: {e}")
+            return None
+
+    def set_auto_trigger_pipelines(self, enabled: bool):
+        """
+        Enable or disable automatic pipeline triggering after commits.
+
+        Args:
+            enabled: Whether to automatically trigger pipelines after commits
+        """
+        self._auto_trigger_pipelines = enabled
+        print(f"Auto-trigger pipelines: {'enabled' if enabled else 'disabled'}")
+
     def _monitor_loop(self):
         """Main monitoring loop."""
         while self._running:
@@ -421,6 +553,17 @@ class Orchestrator:
 
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive system status."""
+        # Get CI/CD integration health
+        ci_status = {}
+        for platform, integration in self.ci_integrations.items():
+            try:
+                ci_status[platform] = integration.health_check()
+            except Exception as e:
+                ci_status[platform] = {
+                    "status": "error",
+                    "error": str(e),
+                }
+
         return {
             "state": self.state.get_metrics(),
             "agents": self.agents.get_agent_metrics(),
@@ -428,7 +571,10 @@ class Orchestrator:
             "sessions": {
                 "active": len(self.sessions.get_active_sessions()),
                 "list": self.sessions.list_sessions(),
-            }
+            },
+            "ci_integrations": ci_status,
+            "pipelines": self.pipeline_monitor.get_pipeline_metrics(),
+            "auto_trigger_pipelines": self._auto_trigger_pipelines,
         }
 
     def create_task(self, **kwargs) -> str:
