@@ -497,13 +497,15 @@ class Jenkins(PipelineIntegration):
                     build_info = self._get_build_info(job_name, build_number)
 
                     # Map Jenkins status to PipelineStatus
-                    jenkins_status = build_info.get("result", "UNKNOWN").lower()
                     building = build_info.get("building", False)
+                    result = build_info.get("result")
 
                     if building:
                         pipeline_status = PipelineStatus.RUNNING
                         jenkins_status = "running"
                     else:
+                        # Use "UNKNOWN" if result is None
+                        jenkins_status = (result or "UNKNOWN").lower()
                         pipeline_status = self._map_status(jenkins_status)
 
                     # Build status dictionary
@@ -605,6 +607,33 @@ class Jenkins(PipelineIntegration):
                     )
                     return status_info["status"]
 
+                # Check if this is a queued job (has queue_id but no build_number yet)
+                queue_id = run.metadata.get("queue_id")
+                if queue_id:
+                    # Check queue status
+                    queue_info = self._get_queue_info(queue_id)
+                    if queue_info.get("cancelled", False):
+                        return PipelineStatus.CANCELLED
+
+                    # Check if build has started
+                    executable = queue_info.get("executable", {})
+                    if executable:
+                        # Update run with build number
+                        build_number = executable.get("number")
+                        run.metadata["build_number"] = build_number
+                        run.url = executable.get("url")
+                        run.status = PipelineStatus.RUNNING
+
+                        # Get build status
+                        status_info = self.get_build_status(
+                            job_name=run.repository,
+                            build_number=build_number
+                        )
+                        return status_info["status"]
+
+                    # Still queued
+                    return PipelineStatus.QUEUED
+
             # Try to parse as build number
             try:
                 build_number = int(run_id)
@@ -614,7 +643,7 @@ class Jenkins(PipelineIntegration):
                 )
                 return status_info["status"]
             except ValueError:
-                # It's a queue ID, check queue status
+                # It's a queue ID (not a tracked run), check queue status
                 queue_info = self._get_queue_info(run_id)
                 if queue_info.get("cancelled", False):
                     return PipelineStatus.CANCELLED
@@ -622,14 +651,8 @@ class Jenkins(PipelineIntegration):
                 # Check if build has started
                 executable = queue_info.get("executable", {})
                 if executable:
-                    # Update run with build number
-                    build_number = executable.get("number")
-                    if run:
-                        run.metadata["build_number"] = build_number
-                        run.url = executable.get("url")
-                        run.status = PipelineStatus.RUNNING
-
                     # Get build status
+                    build_number = executable.get("number")
                     status_info = self.get_build_status(
                         job_name=self.job_name,
                         build_number=build_number
