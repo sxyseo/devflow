@@ -29,15 +29,28 @@ Automatically generate and maintain documentation for code changes, API endpoint
 
 ### 1. Initialize Documentation Generator
 ```bash
-# Set up the documentation generator agent
+# Import the documentation generator agent
 from agents.doc_generator import DocumentationGeneratorAgent
 
-agent = DocumentationGeneratorAgent(project_path="/path/to/project")
+# Create agent instance with project path
+agent = DocumentationGeneratorAgent(project_path="./devflow")
 ```
 
-### 2. Analyze Codebase
+Verify agent initialization:
 ```bash
-# Analyze code structure and extract documentation information
+# Check that analyzer and generator components are loaded
+print(f"Analyzer: {agent.analyzer}")
+print(f"Generator: {agent.generator}")
+print(f"Metrics Tracker: {agent.metrics_tracker}")
+```
+
+### 2. Analyze Codebase Structure
+
+#### 2.1. Scan Project Files
+```bash
+# Create generation request
+from agents.doc_generator import DocGenerationRequest
+
 request = DocGenerationRequest(
     source_path="./devflow",
     output_path="./docs",
@@ -46,66 +59,275 @@ request = DocGenerationRequest(
     generate_metrics=True
 )
 
-# Run analysis phase
+# Scan source directory for code files
 analysis_result = agent.analyze_codebase(request.source_path)
-print(f"Found {len(analysis_result.get('files', []))} files to analyze")
 ```
 
-### 3. Detect Documentation Gaps
+Verify scan results:
 ```bash
-# Compare code state with existing documentation
+# Check discovered files
+files = analysis_result.get('files', [])
+print(f"Found {len(files)} files to analyze")
+
+# Display file breakdown by type
+from collections import Counter
+file_types = Counter(f.suffix for f in files)
+for ext, count in file_types.most_common():
+    print(f"  {ext}: {count} files")
+```
+
+#### 2.2. Extract Code Structure
+```bash
+# Parse AST and extract documentation-relevant information
+for file_path in files:
+    try:
+        ast_info = agent.analyzer._parse_file(file_path)
+        classes = agent.analyzer._extract_classes(ast_info)
+        functions = agent.analyzer._extract_functions(ast_info)
+        print(f"{file_path}: {len(classes)} classes, {len(functions)} functions")
+    except Exception as e:
+        print(f"Error parsing {file_path}: {e}")
+```
+
+### 3. Detect Changes and Gaps
+
+#### 3.1. Compare with Existing Documentation
+```bash
+# Detect files that lack documentation
 gaps = agent.detect_documentation_gaps(request.source_path)
 
+# Categorize gaps by type
+gap_types = {}
 for gap in gaps:
-    print(f"Gap: {gap['type']} - {gap['file_path']}")
-    print(f"  Reason: {gap['reason']}")
+    gap_type = gap['type']
+    if gap_type not in gap_types:
+        gap_types[gap_type] = []
+    gap_types[gap_type].append(gap)
+
+# Display summary
+for gap_type, items in gap_types.items():
+    print(f"{gap_type}: {len(items)} gaps")
+```
+
+#### 3.2. Identify Changed Files (Incremental Mode)
+```bash
+# For incremental updates, detect recently modified files
+import os
+import time
+
+cutoff_time = time.time() - (24 * 3600)  # Last 24 hours
+changed_files = []
+
+for file_path in files:
+    mtime = os.path.getmtime(file_path)
+    if mtime > cutoff_time:
+        changed_files.append(file_path)
+
+print(f"Detected {len(changed_files)} recently changed files")
 ```
 
 ### 4. Generate Documentation
-```bash
-# Generate documentation for requested types
-result = agent.run_generation_workflow(request)
 
-if result.success:
-    print(f"Generated {len(result.files_generated)} documentation files")
-    print(f"Duration: {result.duration:.2f}s")
+#### 4.1. Prepare Output Directory
+```bash
+# Ensure output directory exists
+import os
+os.makedirs(request.output_path, exist_ok=True)
+
+# Set up subdirectories for different doc types
+for doc_type in request.doc_types:
+    type_dir = os.path.join(request.output_path, doc_type)
+    os.makedirs(type_dir, exist_ok=True)
+```
+
+#### 4.2. Generate API Documentation
+```bash
+# Generate API docs for all discovered functions and classes
+if "api" in request.doc_types:
+    api_result = agent._generate_api_docs(analysis_result)
+
+    # Verify generated files
+    for doc_file in api_result.files_generated:
+        print(f"Generated: {doc_file}")
+        # Check file size (should be non-zero)
+        file_size = os.path.getsize(doc_file)
+        print(f"  Size: {file_size} bytes")
+```
+
+#### 4.3. Generate README Documentation
+```bash
+# Generate or update README with project overview
+if "readme" in request.doc_types:
+    readme_result = agent._generate_readme_docs(analysis_result)
+
+    # Verify README structure
+    readme_path = os.path.join(request.output_path, "README.md")
+    if os.path.exists(readme_path):
+        with open(readme_path, 'r') as f:
+            content = f.read()
+            print(f"README generated: {len(content)} characters")
+            # Check for required sections
+            required_sections = ["## Overview", "## Installation", "## Usage"]
+            for section in required_sections:
+                if section in content:
+                    print(f"  ✓ {section} present")
+                else:
+                    print(f"  ✗ {section} missing")
+```
+
+#### 4.4. Generate Architecture Diagrams
+```bash
+# Generate Mermaid diagrams showing system architecture
+if "architecture" in request.doc_types:
+    arch_result = agent._generate_architecture_docs(analysis_result)
+
+    # Validate Mermaid syntax
+    for doc_file in arch_result.files_generated:
+        if doc_file.endswith('.md'):
+            with open(doc_file, 'r') as f:
+                content = f.read()
+                if '```mermaid' in content:
+                    print(f"✓ Mermaid diagram in {doc_file}")
+```
+
+### 5. Validate Quality
+
+#### 5.1. Validate Generated Files
+```bash
+# Run validation phase
+validation_result = agent._validate_phase(request)
+
+# Check validation results
+if validation_result.success:
+    print("✓ All generated files validated successfully")
 else:
-    print(f"Errors: {result.errors}")
+    print("✗ Validation errors found:")
+    for error in validation_result.errors:
+        print(f"  - {error.file_path}: {error.message}")
 ```
 
-### 5. Validate and Update Metrics
+#### 5.2. Check Documentation Completeness
 ```bash
-# Validate generated documentation
-validation_result = agent._validate_phase(result)
+# Verify all public APIs are documented
+for file_path in files:
+    ast_info = agent.analyzer._parse_file(file_path)
+    classes = agent.analyzer._extract_classes(ast_info)
+    functions = agent.analyzer._extract_functions(ast_info)
 
-# Calculate metrics
+    # Check for missing docstrings
+    for cls in classes:
+        if not cls.docstring:
+            print(f"Warning: Class {cls.name} lacks docstring in {file_path}")
+
+    for func in functions:
+        if not func.docstring:
+            print(f"Warning: Function {func.name} lacks docstring in {file_path}")
+```
+
+### 6. Update Metrics
+
+#### 6.1. Calculate Coverage Metrics
+```bash
+# Generate metrics report if requested
 if request.generate_metrics:
-    metrics = agent._calculate_metrics(result)
-    print(f"Coverage: {metrics.get('coverage', 'N/A')}")
+    metrics = agent._calculate_metrics(request)
+
+    # Display key metrics
+    print(f"Documentation Coverage: {metrics.get('coverage', 'N/A')}")
     print(f"Quality Score: {metrics.get('quality_score', 'N/A')}")
+    print(f"Freshness Score: {metrics.get('freshness', 'N/A')}")
 ```
 
-### 6. Propose Documentation Tasks (Optional)
+#### 6.2. Save Metrics Report
 ```bash
-# Create tasks for missing or outdated documentation
+# Write metrics to file for tracking trends
+metrics_path = os.path.join(request.output_path, "metrics.json")
+with open(metrics_path, 'w') as f:
+    json.dump(metrics, f, indent=2)
+
+print(f"Metrics saved to: {metrics_path}")
+```
+
+#### 6.3. Track Trends Over Time
+```bash
+# Compare with previous metrics
+from devflow.docs.metrics import DocumentationMetrics
+
+tracker = DocumentationMetrics()
+current_metrics = tracker.generate_report(request.source_path)
+trends = tracker.get_trends(current_metrics)
+
+if trends:
+    print("\nMetrics Trends:")
+    for metric, trend in trends.items():
+        direction = "↑" if trend > 0 else "↓"
+        print(f"  {metric}: {direction} {abs(trend):.1f}%")
+```
+
+### 7. Handle Optional Tasks
+
+#### 7.1. Propose Documentation Tasks
+```bash
+# Generate tasks for missing documentation
 tasks = agent.propose_documentation_tasks(request.source_path)
 
-for task in tasks:
-    print(f"Task {task.task_id}: {task.type}")
-    print(f"  Priority: {task.priority}")
-    print(f"  Action: {task.suggested_action}")
+# Sort by priority
+priority_order = {"high": 0, "medium": 1, "low": 2}
+tasks_sorted = sorted(tasks, key=lambda t: priority_order.get(t.priority, 3))
+
+# Display top priority tasks
+print("\nTop Priority Documentation Tasks:")
+for task in tasks_sorted[:5]:
+    print(f"  [{task.priority.upper()}] {task.type}")
+    print(f"    {task.suggested_action}")
 ```
 
-### 7. Incremental Updates (Ongoing)
+#### 7.2. Create Task Files (Optional)
 ```bash
-# Update only changed files (efficient for large codebases)
-incremental_result = agent.incremental_update(
-    source_path=request.source_path,
-    doc_types=request.doc_types
-)
+# Write tasks to file for review
+tasks_dir = "./.taskmaster/docs-tasks"
+os.makedirs(tasks_dir, exist_ok=True)
 
-print(f"Updated {len(incremental_result.files_generated)} files")
-print(f"Detected {incremental_result.metrics.get('changes_detected', 0)} changes")
+for task in tasks_sorted:
+    task_file = os.path.join(tasks_dir, f"{task.task_id}.md")
+    with open(task_file, 'w') as f:
+        f.write(f"# Documentation Task: {task.task_id}\n\n")
+        f.write(f"**Type:** {task.type}\n")
+        f.write(f"**Priority:** {task.priority}\n")
+        f.write(f"**File:** {task.file_path}\n\n")
+        f.write(f"## Action Required\n\n{task.suggested_action}\n")
+
+print(f"Created {len(tasks)} task files in {tasks_dir}")
+```
+
+### 8. Commit Generated Documentation
+
+#### 8.1. Review Generated Files
+```bash
+# Display summary of changes
+print("\nGenerated Documentation Summary:")
+print(f"  Total files: {len(result.files_generated)}")
+print(f"  API docs: {len([f for f in result.files_generated if 'api' in f])}")
+print(f"  READMEs: {len([f for f in result.files_generated if 'README' in f])}")
+print(f"  Architecture: {len([f for f in result.files_generated if 'architecture' in f])}")
+print(f"  Duration: {result.duration:.2f}s")
+```
+
+#### 8.2. Stage and Commit
+```bash
+# Add generated documentation to git
+git add ./docs
+
+# Create commit with descriptive message
+git commit -m "docs: auto-generated documentation
+
+- Generated API documentation for public interfaces
+- Updated README with current project structure
+- Synchronized architecture diagrams
+- Coverage: ${metrics.get('coverage', 'N/A')}
+- Quality Score: ${metrics.get('quality_score', 'N/A')}
+
+Co-Authored-By: Claude Documentation Generator"
 ```
 
 ## Quality Standards
