@@ -301,22 +301,326 @@ class DocumentationGenerator:
         Returns:
             Markdown formatted API documentation
         """
-        # Placeholder implementation - will be expanded in subtask-2-2
         lines = ["# API Reference\n"]
 
-        if "functions" in analyzed_code:
-            lines.append("## Functions\n")
-            for func in analyzed_code.get("functions", []):
-                func_name = func.get("name", "unknown")
-                lines.append(f"### {func_name}\n")
-
-        if "classes" in analyzed_code:
-            lines.append("## Classes\n")
-            for cls in analyzed_code.get("classes", []):
-                cls_name = cls.get("name", "unknown")
-                lines.append(f"### {cls_name}\n")
+        # Check if this is a single file analysis or multiple files
+        if "file_path" in analyzed_code:
+            # Single file analysis
+            self._generate_single_file_docs(analyzed_code, lines)
+        elif "files" in analyzed_code:
+            # Multiple files analysis
+            self._generate_multiple_files_docs(analyzed_code, lines)
+        else:
+            # Legacy format with top-level functions/classes
+            self._generate_legacy_format_docs(analyzed_code, lines)
 
         return "\n".join(lines)
+
+    def _generate_single_file_docs(
+        self,
+        file_analysis: Dict[str, Any],
+        lines: List[str]
+    ) -> None:
+        """
+        Generate documentation for a single analyzed file.
+
+        Args:
+            file_analysis: Analysis result for a single file
+            lines: List to append documentation lines to
+        """
+        file_path = file_analysis.get("file_path", "unknown")
+        lines.append(f"\n## File: {file_path}\n")
+
+        # Add module docstring if present
+        module_docstring = file_analysis.get("module_docstring")
+        if module_docstring:
+            lines.append(f"{module_docstring}\n")
+
+        # Generate documentation for classes
+        classes = file_analysis.get("classes", [])
+        if classes:
+            lines.append("\n### Classes\n")
+            for cls in classes:
+                self._generate_class_docs(cls, lines)
+
+        # Generate documentation for functions
+        functions = file_analysis.get("functions", [])
+        if functions:
+            lines.append("\n### Functions\n")
+            for func in functions:
+                self._generate_function_docs(func, lines)
+
+    def _generate_multiple_files_docs(
+        self,
+        analyzed_code: Dict[str, Any],
+        lines: List[str]
+    ) -> None:
+        """
+        Generate documentation for multiple analyzed files.
+
+        Args:
+            analyzed_code: Analysis result containing multiple files
+            lines: List to append documentation lines to
+        """
+        for file_data in analyzed_code.get("files", []):
+            self._generate_single_file_docs(file_data, lines)
+
+    def _generate_legacy_format_docs(
+        self,
+        analyzed_code: Dict[str, Any],
+        lines: List[str]
+    ) -> None:
+        """
+        Generate documentation from legacy format (top-level functions/classes).
+
+        Args:
+            analyzed_code: Analysis result in legacy format
+            lines: List to append documentation lines to
+        """
+        # Generate documentation for classes
+        classes = analyzed_code.get("classes", [])
+        if classes:
+            lines.append("\n## Classes\n")
+            for cls in classes:
+                self._generate_class_docs(cls, lines)
+
+        # Generate documentation for functions
+        functions = analyzed_code.get("functions", [])
+        if functions:
+            lines.append("\n## Functions\n")
+            for func in functions:
+                self._generate_function_docs(func, lines)
+
+        # Generate documentation for API endpoints if present
+        api_endpoints = analyzed_code.get("api_endpoints", [])
+        if api_endpoints:
+            lines.append("\n## API Endpoints\n")
+            for endpoint in api_endpoints:
+                self._generate_endpoint_docs(endpoint, lines)
+
+    def _generate_class_docs(self, cls: Dict[str, Any], lines: List[str]) -> None:
+        """
+        Generate documentation for a class.
+
+        Args:
+            cls: Class information dictionary
+            lines: List to append documentation lines to
+        """
+        class_name = cls.get("name", "Unknown")
+        lines.append(f"\n#### Class: `{class_name}`\n")
+
+        # Add class docstring
+        docstring = cls.get("docstring")
+        if docstring:
+            lines.append(f"{docstring}\n")
+
+        # Add class signature if available
+        signature = cls.get("signature")
+        if signature:
+            lines.append(f"\n**Signature:** `{signature}`\n")
+
+        # Add decorators if present
+        decorators = cls.get("decorators", [])
+        if decorators:
+            lines.append("\n**Decorators:**\n")
+            for decorator in decorators:
+                lines.append(f"- `{decorator}`\n")
+            lines.append("")
+
+        # Add methods
+        methods = cls.get("methods", [])
+        if methods:
+            lines.append("\n**Methods:**\n")
+            for method in methods:
+                method_name = method.get("name", "unknown")
+                lines.append(f"\n##### `{class_name}.{method_name}`\n")
+
+                # Add method docstring
+                method_docstring = method.get("docstring")
+                if method_docstring:
+                    lines.append(f"{method_docstring}\n")
+
+                # Add method signature
+                method_signature = method.get("signature")
+                if method_signature:
+                    lines.append(f"\n**Signature:** `{method_signature}`\n")
+
+                # Add parameters
+                parameters = method.get("parameters", [])
+                if parameters:
+                    lines.append("\n**Parameters:**\n")
+                    for param in parameters:
+                        param_name = param.get("name", "unknown")
+                        param_type = param.get("type", "")
+                        param_desc = param.get("description", "")
+                        default = param.get("default")
+
+                        param_line = f"- `{param_name}`"
+                        if param_type:
+                            param_line += f" ({param_type})"
+                        if default is not None:
+                            param_line += f" = {default}"
+
+                        lines.append(param_line)
+
+                        if param_desc:
+                            lines.append(f"  - {param_desc}")
+
+                    lines.append("")
+
+                # Add return type
+                return_type = method.get("return_type")
+                if return_type:
+                    lines.append(f"\n**Returns:** `{return_type}`\n")
+
+    def _generate_function_docs(
+        self,
+        func: Dict[str, Any],
+        lines: List[str]
+    ) -> None:
+        """
+        Generate documentation for a function.
+
+        Args:
+            func: Function information dictionary
+            lines: List to append documentation lines to
+        """
+        func_name = func.get("name", "unknown")
+        is_private = func_name.startswith("_")
+
+        # Skip private functions if not configured to include them
+        if is_private and not self.config.include_private:
+            return
+
+        lines.append(f"\n#### Function: `{func_name}`\n")
+
+        # Add function docstring
+        docstring = func.get("docstring")
+        if docstring:
+            lines.append(f"{docstring}\n")
+
+        # Add function signature
+        signature = func.get("signature")
+        if signature:
+            lines.append(f"\n**Signature:** `{signature}`\n")
+
+        # Add decorators if present
+        decorators = func.get("decorators", [])
+        if decorators:
+            lines.append("\n**Decorators:**\n")
+            for decorator in decorators:
+                lines.append(f"- `{decorator}`\n")
+            lines.append("")
+
+        # Add parameters
+        parameters = func.get("parameters", [])
+        if parameters:
+            lines.append("\n**Parameters:**\n")
+            for param in parameters:
+                param_name = param.get("name", "unknown")
+                param_type = param.get("type", "")
+                param_desc = param.get("description", "")
+                default = param.get("default")
+
+                param_line = f"- `{param_name}`"
+                if param_type:
+                    param_line += f" ({param_type})"
+                if default is not None:
+                    param_line += f" = {default}"
+
+                lines.append(param_line)
+
+                if param_desc:
+                    lines.append(f"  - {param_desc}")
+
+            lines.append("")
+
+        # Add return type and description
+        return_type = func.get("return_type")
+        return_desc = func.get("return_description")
+
+        if return_type or return_desc:
+            lines.append("\n**Returns:**\n")
+            if return_type:
+                lines.append(f"- Type: `{return_type}`")
+            if return_desc:
+                lines.append(f"- {return_desc}")
+            lines.append("")
+
+        # Add examples if present
+        examples = func.get("examples", [])
+        if examples:
+            lines.append("\n**Examples:**\n")
+            for example in examples:
+                lines.append(f"```python\n{example}\n```")
+            lines.append("")
+
+    def _generate_endpoint_docs(
+        self,
+        endpoint: Dict[str, Any],
+        lines: List[str]
+    ) -> None:
+        """
+        Generate documentation for an API endpoint.
+
+        Args:
+            endpoint: API endpoint information dictionary
+            lines: List to append documentation lines to
+        """
+        method = endpoint.get("method", "GET").upper()
+        path = endpoint.get("path", "/")
+        endpoint_name = endpoint.get("name", f"{method} {path}")
+
+        lines.append(f"\n### {endpoint_name}\n")
+
+        # Add endpoint description
+        description = endpoint.get("description")
+        if description:
+            lines.append(f"{description}\n")
+
+        lines.append(f"\n**Method:** `{method}`\n")
+        lines.append(f"**Path:** `{path}`\n")
+
+        # Add parameters
+        parameters = endpoint.get("parameters", [])
+        if parameters:
+            lines.append("\n**Parameters:**\n")
+            for param in parameters:
+                param_name = param.get("name", "unknown")
+                param_type = param.get("type", "")
+                param_location = param.get("location", "query")  # query, path, body
+                required = param.get("required", False)
+                param_desc = param.get("description", "")
+
+                param_line = f"- `{param_name}`"
+                if param_type:
+                    param_line += f" ({param_type})"
+                param_line += f" - {param_location}"
+                if required:
+                    param_line += " (required)"
+
+                lines.append(param_line)
+
+                if param_desc:
+                    lines.append(f"  - {param_desc}")
+
+            lines.append("")
+
+        # Add response information
+        response = endpoint.get("response", {})
+        if response:
+            lines.append("\n**Response:**\n")
+            response_desc = response.get("description", "")
+            if response_desc:
+                lines.append(f"{response_desc}\n")
+
+            response_schema = response.get("schema")
+            if response_schema:
+                lines.append("\n**Schema:**\n")
+                lines.append("```json")
+                lines.append(response_schema)
+                lines.append("```")
+                lines.append("")
 
     def _generate_getting_started(self, analyzed_code: Dict[str, Any]) -> str:
         """
