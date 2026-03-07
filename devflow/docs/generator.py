@@ -213,9 +213,40 @@ class DocumentationGenerator:
         if not code_structure:
             raise ValueError("code_structure cannot be empty")
 
-        # This will be implemented in subtask-2-4
-        # For now, return empty list
-        return []
+        # Determine diagram directory
+        if diagram_dir:
+            target_dir = Path(diagram_dir)
+        else:
+            target_dir = self._output_dir / "diagrams"
+
+        # Ensure directory exists
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            raise IOError(f"Failed to create diagram directory {target_dir}: {e}")
+
+        diagrams = []
+
+        # Generate different types of architecture diagrams
+        # 1. Module dependency diagram
+        module_diagram = self._generate_module_diagram(code_structure, target_dir)
+        if module_diagram:
+            diagrams.append(module_diagram)
+
+        # 2. Class hierarchy diagram
+        class_diagram = self._generate_class_diagram(code_structure, target_dir)
+        if class_diagram:
+            diagrams.append(class_diagram)
+
+        # 3. Component interaction diagram
+        component_diagram = self._generate_component_diagram(
+            code_structure,
+            target_dir
+        )
+        if component_diagram:
+            diagrams.append(component_diagram)
+
+        return diagrams
 
     def generate_documentation(
         self,
@@ -877,3 +908,370 @@ class DocumentationGenerator:
             result = result.replace(placeholder, str(value))
 
         return result
+
+    def _generate_module_diagram(
+        self,
+        code_structure: Dict[str, Any],
+        target_dir: Path
+    ) -> Optional[ArchitectureDiagram]:
+        """
+        Generate a module dependency diagram using Mermaid.
+
+        Args:
+            code_structure: Code structure dictionary
+            target_dir: Directory to save the diagram
+
+        Returns:
+            ArchitectureDiagram object or None if no modules to diagram
+        """
+        # Extract module information
+        modules = self._extract_modules(code_structure)
+        if not modules:
+            return None
+
+        # Build Mermaid graph
+        lines = ["graph TD"]
+        lines.append("    %% Module Dependency Diagram")
+
+        # Add nodes for each module
+        for module in modules:
+            module_name = module.get("name", "unknown")
+            module_id = f"module_{module_name.replace('.', '_')}"
+            lines.append(f"    {module_id}[\"{module_name}\"]")
+
+        # Add edges for dependencies
+        for module in modules:
+            module_name = module.get("name", "unknown")
+            module_id = f"module_{module_name.replace('.', '_')}"
+
+            dependencies = module.get("dependencies", [])
+            for dep in dependencies:
+                dep_id = f"module_{dep.replace('.', '_')}"
+                lines.append(f"    {module_id} --> {dep_id}")
+
+        # Add styling
+        lines.append("")
+        lines.append("    classDef moduleStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px;")
+        lines.append("    class module_.* moduleStyle;")
+
+        content = "\n".join(lines)
+        file_path = target_dir / "module_dependencies.mmd"
+
+        # Write diagram file
+        try:
+            file_path.write_text(content, encoding="utf-8")
+        except Exception as e:
+            raise IOError(f"Failed to write module diagram: {e}")
+
+        return ArchitectureDiagram(
+            diagram_type="mermaid",
+            content=content,
+            file_path=str(file_path),
+            metadata={
+                "title": "Module Dependencies",
+                "description": "Shows module dependencies in the codebase",
+                "module_count": len(modules),
+            },
+        )
+
+    def _generate_class_diagram(
+        self,
+        code_structure: Dict[str, Any],
+        target_dir: Path
+    ) -> Optional[ArchitectureDiagram]:
+        """
+        Generate a class hierarchy diagram using Mermaid.
+
+        Args:
+            code_structure: Code structure dictionary
+            target_dir: Directory to save the diagram
+
+        Returns:
+            ArchitectureDiagram object or None if no classes to diagram
+        """
+        # Extract class information
+        classes = self._extract_classes(code_structure)
+        if not classes:
+            return None
+
+        # Build Mermaid class diagram
+        lines = ["classDiagram"]
+        lines.append("    %% Class Hierarchy Diagram")
+
+        # Add class definitions
+        for cls in classes:
+            class_name = cls.get("name", "Unknown")
+            lines.append(f"    class {class_name} {{")
+
+            # Add methods
+            methods = cls.get("methods", [])
+            if methods:
+                for method in methods:
+                    method_name = method.get("name", "unknown")
+                    lines.append(f"        +{method_name}()")
+                lines.append("    }")
+            else:
+                lines.append("    }")
+
+        # Add inheritance relationships
+        for cls in classes:
+            class_name = cls.get("name", "Unknown")
+            base_class = cls.get("base_class")
+
+            if base_class:
+                lines.append(f"    {base_class} <|-- {class_name}")
+
+        # Add composition/aggregation relationships
+        for cls in classes:
+            class_name = cls.get("name", "Unknown")
+            associations = cls.get("associations", [])
+
+            for assoc in associations:
+                assoc_type = assoc.get("type", "association")
+                target_class = assoc.get("target")
+
+                if assoc_type == "composition":
+                    lines.append(f"    {class_name} *-- {target_class}")
+                elif assoc_type == "aggregation":
+                    lines.append(f"    {class_name} o-- {target_class}")
+                else:
+                    lines.append(f"    {class_name} --> {target_class}")
+
+        content = "\n".join(lines)
+        file_path = target_dir / "class_hierarchy.mmd"
+
+        # Write diagram file
+        try:
+            file_path.write_text(content, encoding="utf-8")
+        except Exception as e:
+            raise IOError(f"Failed to write class diagram: {e}")
+
+        return ArchitectureDiagram(
+            diagram_type="mermaid",
+            content=content,
+            file_path=str(file_path),
+            metadata={
+                "title": "Class Hierarchy",
+                "description": "Shows class relationships and inheritance",
+                "class_count": len(classes),
+            },
+        )
+
+    def _generate_component_diagram(
+        self,
+        code_structure: Dict[str, Any],
+        target_dir: Path
+    ) -> Optional[ArchitectureDiagram]:
+        """
+        Generate a component interaction diagram using Mermaid.
+
+        Args:
+            code_structure: Code structure dictionary
+            target_dir: Directory to save the diagram
+
+        Returns:
+            ArchitectureDiagram object or None if no components to diagram
+        """
+        # Extract component information
+        components = self._extract_components(code_structure)
+        if not components:
+            return None
+
+        # Build Mermaid flowchart
+        lines = ["graph LR"]
+        lines.append("    %% Component Interaction Diagram")
+
+        # Add nodes for each component
+        for component in components:
+            comp_name = component.get("name", "unknown")
+            comp_type = component.get("type", "component")
+            comp_id = f"comp_{comp_name.replace(' ', '_').lower()}"
+            comp_label = f"{comp_name}\\n({comp_type})"
+            lines.append(f"    {comp_id}[\"{comp_label}\"]")
+
+        # Add edges for interactions
+        for component in components:
+            comp_name = component.get("name", "unknown")
+            comp_id = f"comp_{comp_name.replace(' ', '_').lower()}"
+
+            interactions = component.get("interactions", [])
+            for interaction in interactions:
+                target = interaction.get("target")
+                label = interaction.get("label", "")
+
+                target_id = f"comp_{target.replace(' ', '_').lower()}"
+
+                if label:
+                    lines.append(f"    {comp_id} -->|{label}| {target_id}")
+                else:
+                    lines.append(f"    {comp_id} --> {target_id}")
+
+        # Add styling
+        lines.append("")
+        lines.append("    classDef componentStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;")
+        lines.append("    classDef serviceStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;")
+        lines.append("    classDef databaseStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px;")
+        lines.append("    class comp_.* componentStyle;")
+
+        content = "\n".join(lines)
+        file_path = target_dir / "component_interaction.mmd"
+
+        # Write diagram file
+        try:
+            file_path.write_text(content, encoding="utf-8")
+        except Exception as e:
+            raise IOError(f"Failed to write component diagram: {e}")
+
+        return ArchitectureDiagram(
+            diagram_type="mermaid",
+            content=content,
+            file_path=str(file_path),
+            metadata={
+                "title": "Component Interactions",
+                "description": "Shows how components interact with each other",
+                "component_count": len(components),
+            },
+        )
+
+    def _extract_modules(self, code_structure: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract module information from code structure.
+
+        Args:
+            code_structure: Code structure dictionary
+
+        Returns:
+            List of module dictionaries
+        """
+        modules = []
+
+        # Handle different input formats
+        if "files" in code_structure:
+            # Multiple files format
+            for file_data in code_structure["files"]:
+                imports = file_data.get("imports", [])
+                file_path = file_data.get("file_path", "")
+                module_name = self._path_to_module_name(file_path)
+
+                if module_name:
+                    modules.append({
+                        "name": module_name,
+                        "dependencies": [imp.get("module", "") for imp in imports if imp.get("module")],
+                    })
+        elif "file_path" in code_structure:
+            # Single file format
+            imports = code_structure.get("imports", [])
+            file_path = code_structure.get("file_path", "")
+            module_name = self._path_to_module_name(file_path)
+
+            if module_name:
+                modules.append({
+                    "name": module_name,
+                    "dependencies": [imp.get("module", "") for imp in imports if imp.get("module")],
+                })
+
+        return modules
+
+    def _extract_classes(self, code_structure: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract class information from code structure.
+
+        Args:
+            code_structure: Code structure dictionary
+
+        Returns:
+            List of class dictionaries
+        """
+        classes = []
+
+        # Handle different input formats
+        if "files" in code_structure:
+            # Multiple files format
+            for file_data in code_structure["files"]:
+                file_classes = file_data.get("classes", [])
+                for cls in file_classes:
+                    classes.append(cls)
+        elif "file_path" in code_structure:
+            # Single file format
+            file_classes = code_structure.get("classes", [])
+            for cls in file_classes:
+                classes.append(cls)
+        elif "classes" in code_structure:
+            # Legacy format
+            classes = code_structure.get("classes", [])
+
+        return classes
+
+    def _extract_components(self, code_structure: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract component information from code structure.
+
+        Args:
+            code_structure: Code structure dictionary
+
+        Returns:
+            List of component dictionaries
+        """
+        components = []
+
+        # Analyze classes to determine components
+        classes = self._extract_classes(code_structure)
+
+        for cls in classes:
+            class_name = cls.get("name", "Unknown")
+
+            # Determine component type based on naming patterns
+            comp_type = "component"
+            if "Service" in class_name or "service" in class_name:
+                comp_type = "service"
+            elif "Repository" in class_name or "repository" in class_name:
+                comp_type = "repository"
+            elif "Controller" in class_name or "controller" in class_name:
+                comp_type = "controller"
+            elif "Model" in class_name or "model" in class_name:
+                comp_type = "model"
+            elif "Database" in class_name or "database" in class_name:
+                comp_type = "database"
+
+            # Extract interactions from methods
+            interactions = []
+            methods = cls.get("methods", [])
+            for method in methods:
+                method_name = method.get("name", "")
+                # Simple heuristic: if method calls other components, add interaction
+                if "call" in method_name.lower() or "get" in method_name.lower() or "fetch" in method_name.lower():
+                    # This is a simplified analysis - in practice, you'd parse method bodies
+                    pass
+
+            components.append({
+                "name": class_name,
+                "type": comp_type,
+                "interactions": interactions,
+            })
+
+        return components
+
+    def _path_to_module_name(self, file_path: str) -> str:
+        """
+        Convert file path to module name.
+
+        Args:
+            file_path: File path string
+
+        Returns:
+            Module name string
+        """
+        path = Path(file_path)
+
+        # Remove file extension
+        name = path.stem
+
+        # Join with parent directories if within a package
+        parts = path.parent.parts
+        if parts and "src" in parts:
+            src_idx = parts.index("src")
+            package_parts = parts[src_idx + 1:]
+            if package_parts:
+                name = ".".join(package_parts) + "." + name
+
+        return name
