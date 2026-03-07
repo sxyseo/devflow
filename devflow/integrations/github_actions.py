@@ -437,9 +437,183 @@ class GitHubActions(PipelineIntegration):
             logger.error(f"Unexpected error triggering workflow: {e}")
             raise ConnectionError(f"Failed to trigger GitHub Actions workflow: {e}")
 
+    def get_workflow_status(
+        self,
+        run_id: str,
+        poll: bool = False,
+        timeout: int = 600,
+        interval: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Get detailed status of a workflow run with optional polling.
+
+        This is a GitHub Actions-specific method that provides comprehensive
+        status information beyond the generic get_pipeline_status() method.
+
+        Args:
+            run_id: Workflow run ID
+            poll: Whether to continuously poll until completion (default: False)
+            timeout: Maximum polling time in seconds (default: 600)
+            interval: Polling interval in seconds (default: 10)
+
+        Returns:
+            Dictionary containing:
+                - status: PipelineStatus enum value
+                - github_status: Raw GitHub status string
+                - conclusion: Raw GitHub conclusion string (if completed)
+                - created_at: Workflow creation timestamp
+                - updated_at: Last update timestamp
+                - started_at: Workflow start timestamp (if started)
+                - completed_at: Workflow completion timestamp (if completed)
+                - url: HTML URL to the workflow run
+                - name: Workflow name
+                - run_number: Workflow run number
+                - run_attempt: Run attempt number
+                - event: Event that triggered the workflow
+                - commit_sha: Commit SHA that triggered the workflow
+                - branch: Branch name
+                - actor: User/actor who triggered the workflow
+                - workflow_id: Workflow ID
+                - jobs: List of job statuses (if available)
+
+        Raises:
+            ValueError: If run_id is not found
+            ConnectionError: If unable to reach GitHub API
+            TimeoutError: If polling timeout is exceeded
+
+        Example:
+            ```python
+            # Get current status without polling
+            status = github.get_workflow_status("123456789")
+
+            # Poll until completion with custom timeout
+            status = github.get_workflow_status("123456789", poll=True, timeout=300)
+            ```
+        """
+        start_time = time.time()
+        last_status = None
+
+        try:
+            while True:
+                try:
+                    endpoint = f"/repos/{self.owner}/{self.repo}/actions/runs/{run_id}"
+                    response = self._make_request("GET", endpoint)
+
+                    # Extract status information
+                    github_status = response.get("status", "unknown")
+                    conclusion = response.get("conclusion")
+
+                    # Map to PipelineStatus
+                    if github_status == "completed" and conclusion:
+                        pipeline_status = self._map_status(conclusion)
+                    else:
+                        pipeline_status = self._map_status(github_status)
+
+                    # Build detailed status dictionary
+                    status_info = {
+                        "status": pipeline_status,
+                        "github_status": github_status,
+                        "conclusion": conclusion,
+                        "created_at": response.get("created_at"),
+                        "updated_at": response.get("updated_at"),
+                        "started_at": response.get("run_started_at"),
+                        "completed_at": response.get("updated_at") if github_status == "completed" else None,
+                        "url": response.get("html_url"),
+                        "name": response.get("name"),
+                        "run_number": response.get("run_number"),
+                        "run_attempt": response.get("run_attempt"),
+                        "event": response.get("event"),
+                        "commit_sha": response.get("head_sha"),
+                        "branch": response.get("head_branch"),
+                        "actor": response.get("triggering_actor", {}).get("login") if response.get("triggering_actor") else None,
+                        "workflow_id": response.get("workflow_id"),
+                    }
+
+                    # Add job information if available
+                    try:
+                        jobs_endpoint = f"/repos/{self.owner}/{self.repo}/actions/runs/{run_id}/jobs"
+                        jobs_response = self._make_request("GET", jobs_endpoint, params={"per_page": 100})
+
+                        jobs = []
+                        for job in jobs_response.get("jobs", []):
+                            jobs.append({
+                                "id": job.get("id"),
+                                "name": job.get("name"),
+                                "status": job.get("status"),
+                                "conclusion": job.get("conclusion"),
+                                "started_at": job.get("started_at"),
+                                "completed_at": job.get("completed_at"),
+                            })
+
+                        status_info["jobs"] = jobs
+
+                    except Exception as e:
+                        # Jobs are optional - log but don't fail
+                        logger.debug(f"Could not fetch job details: {e}")
+                        status_info["jobs"] = []
+
+                    # Log status change if polling
+                    if poll and last_status != pipeline_status:
+                        logger.info(
+                            f"Workflow {run_id} status: {pipeline_status.name} "
+                            f"(GitHub: {github_status}"
+                            + (f" / {conclusion}" if conclusion else "") + ")"
+                        )
+                        last_status = pipeline_status
+
+                    # If not polling or workflow is complete, return status
+                    if not poll or pipeline_status in [
+                        PipelineStatus.SUCCESS,
+                        PipelineStatus.FAILED,
+                        PipelineStatus.CANCELLED
+                    ]:
+                        # Update run in active runs if present
+                        with self.lock:
+                            if run_id in self.active_runs:
+                                self.active_runs[run_id].status = pipeline_status
+                                self.active_runs[run_id].updated_at = time.time()
+
+                        return status_info
+
+                    # Check timeout
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise TimeoutError(
+                            f"Workflow {run_id} did not complete within {timeout} seconds. "
+                            f"Last status: {pipeline_status.name}"
+                        )
+
+                    # Wait before next poll
+                    time.sleep(interval)
+
+                except ValueError as e:
+                    logger.error(f"Failed to get workflow status: {e}")
+                    raise
+                except requests.exceptions.RequestException as e:
+                    # Retry on network errors during polling
+                    if not poll:
+                        raise ConnectionError(f"Failed to get workflow status: {e}")
+
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise TimeoutError(
+                            f"Network errors persisted for {timeout} seconds while polling workflow {run_id}"
+                        )
+
+                    logger.warning(f"Network error during polling, retrying: {e}")
+                    time.sleep(interval)
+
+        except (ValueError, ConnectionError, TimeoutError):
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting workflow status: {e}")
+            raise ConnectionError(f"Failed to get GitHub Actions workflow status: {e}")
+
     def get_pipeline_status(self, run_id: str) -> PipelineStatus:
         """
         Get the current status of a workflow run.
+
+        This is the generic interface method that delegates to get_workflow_status().
 
         Args:
             run_id: Workflow run ID
@@ -452,18 +626,8 @@ class GitHubActions(PipelineIntegration):
             ConnectionError: If unable to reach GitHub API
         """
         try:
-            endpoint = f"/repos/{self.owner}/{self.repo}/actions/runs/{run_id}"
-            response = self._make_request("GET", endpoint)
-
-            # Map GitHub status to PipelineStatus
-            status = response.get("status", "unknown")
-            conclusion = response.get("conclusion")
-
-            # If workflow is completed, use conclusion for final status
-            if status == "completed" and conclusion:
-                return self._map_status(conclusion)
-
-            return self._map_status(status)
+            status_info = self.get_workflow_status(run_id, poll=False)
+            return status_info["status"]
 
         except ValueError as e:
             logger.error(f"Failed to get workflow status: {e}")
