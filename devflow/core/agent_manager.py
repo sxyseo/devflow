@@ -15,6 +15,8 @@ import json
 
 from .state_tracker import StateTracker, AgentStatus, TaskStatus
 from .session_manager import SessionManager, SessionInfo
+from .model_manager import ModelManager
+from .model_selector import ModelSelector, SelectionStrategy
 from ..config.settings import settings
 
 
@@ -46,6 +48,10 @@ class AgentManager:
         self.agents: Dict[str, Dict[str, Any]] = {}
         self.agent_configs: Dict[str, AgentConfig] = self._load_agent_configs()
         self.lock = threading.Lock()
+
+        # Initialize model manager and selector
+        self.model_manager = ModelManager()
+        self.model_selector = ModelSelector(self.model_manager)
 
     def _load_agent_configs(self) -> Dict[str, AgentConfig]:
         """Load agent configurations."""
@@ -124,6 +130,20 @@ class AgentManager:
         if not config:
             config = AgentConfig(agent_type=agent_type)
 
+        # Select model for this agent type using ModelSelector
+        selection_result = self.model_selector.select_model_for_agent(
+            agent_type=agent_type,
+            task=task,
+            strategy=SelectionStrategy.BALANCED
+        )
+
+        # Update config with selected model
+        if selection_result:
+            config.model = selection_result.model_id
+        else:
+            # Fallback to None if no model selected
+            config.model = None
+
         # Store agent info
         with self.lock:
             self.agents[agent_id] = {
@@ -133,6 +153,7 @@ class AgentManager:
                 "task": task,
                 "session_name": session_name,
                 "created_at": time.time(),
+                "model_selection": selection_result,
             }
 
         return agent_id
