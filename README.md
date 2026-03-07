@@ -12,6 +12,7 @@
 - **🎯 多Agent协作** - Planner、Coder、Reviewer、Deployer协同工作
 - **📊 实时监控** - Dashboard可视化，随时掌握进度
 - **🛡️ 安全隔离** - Git Worktree隔离，主分支永远安全
+- **🤖 多模型支持** - 集成Claude、GPT、本地模型，智能选择最优方案
 
 ## 🏗️ 架构设计
 
@@ -33,6 +34,11 @@ DevFlow/
 │   ├── reviewer.py           # 代码审查Agent
 │   ├── tester.py             # 测试Agent
 │   └── deployer.py           # 部署Agent
+├── core/                      # 核心模块
+│   ├── model_manager.py      # 模型管理器
+│   ├── model_selector.py     # 智能模型选择
+│   ├── model_metrics.py      # 性能监控
+│   └── agent_manager.py      # Agent管理
 ├── scripts/                   # 自动化脚本
 │   ├── auto-discover.sh      # 自动发现任务
 │   ├── auto-commit.sh        # 自动提交
@@ -42,6 +48,7 @@ DevFlow/
 │   ├── backend/              # Node.js后端
 │   └── frontend/             # React前端
 └── config/                    # 配置文件
+    ├── model_config.json     # 模型配置
     ├── agents.json           # Agent配置
     ├── workflows.json        # 工作流配置
     └── tmux.conf             # Tmux配置
@@ -160,6 +167,15 @@ cd dashboard && npm run dev
 
 **Skill**: `skills/symphony/SKILL.md`
 
+### 5. 多模型支持 (Multi-Model Support)
+- 支持Claude、GPT、本地模型等多个AI提供商
+- 基于任务类型自动选择最优模型
+- 智能故障转移机制
+- 成本优化与性能监控
+
+**配置**: `config/model_config.json`
+**文档**: [MODEL_USAGE.md](./docs/MODEL_USAGE.md)
+
 ## 🎮 使用场景
 
 ### 场景1：新项目开发
@@ -215,6 +231,55 @@ open http://localhost:5173
 
 ## 🛠️ 高级配置
 
+### 多模型配置
+
+DevFlow支持多个AI模型，自动根据任务类型选择最优方案：
+
+```json
+{
+  "providers": {
+    "anthropic": {
+      "enabled": true,
+      "models": {
+        "claude-3-5-sonnet-20241022": {
+          "capabilities": ["code_generation", "code_review"],
+          "priority": 1
+        }
+      }
+    },
+    "openai": {
+      "enabled": true,
+      "models": {
+        "gpt-4-turbo": {
+          "capabilities": ["analysis", "writing"],
+          "priority": 2
+        }
+      }
+    }
+  },
+  "task_mappings": {
+    "code_generation": {
+      "preferred_models": ["anthropic/claude-3-5-sonnet-20241022"],
+      "fallback_models": ["openai/gpt-4-turbo"]
+    }
+  }
+}
+```
+
+**配置文件**: `config/model_config.json`
+**详细文档**: [MODEL_USAGE.md](./docs/MODEL_USAGE.md)
+
+**支持的提供商**:
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
+- **OpenAI**: GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
+- **本地模型**: Llama, CodeLlama (通过Ollama)
+
+**选择策略**:
+- `balanced`: 平衡成本、速度和质量（默认）
+- `cost_optimized`: 优先考虑成本
+- `quality_optimized`: 优先考虑质量
+- `speed_optimized`: 优先考虑速度
+
 ### 自定义Agent
 
 ```json
@@ -253,6 +318,7 @@ open http://localhost:5173
 
 - [架构设计](./docs/ARCHITECTURE.md)
 - [配置指南](./docs/CONFIGURATION.md)
+- [多模型使用指南](./docs/MODEL_USAGE.md) - 模型配置与选择策略
 - [API文档](./docs/API.md)
 - [最佳实践](./docs/BEST_PRACTICES.md)
 - [故障排查](./docs/TROUBLESHOOTING.md)
