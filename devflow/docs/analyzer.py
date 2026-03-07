@@ -254,32 +254,134 @@ class DocumentationAnalyzer:
         except Exception:
             new_elements = []
 
-        # Detect added elements
-        old_names = {e["name"] for e in old_elements}
-        new_names = {e["name"] for e in new_elements}
+        # Create lookup dictionaries
+        old_by_name = {e["name"]: e for e in old_elements}
+        new_by_name = {e["name"]: e for e in new_elements}
 
-        for element in new_elements:
-            if element["name"] not in old_names:
-                changes.append(CodeChange(
-                    change_type=ChangeType.ADDED,
-                    element_type=DocumentationType.FUNCTION,
-                    element_name=element["name"],
-                    file_path=file_path,
-                    new_value=element.get("signature", ""),
-                ))
+        old_names = set(old_by_name.keys())
+        new_names = set(new_by_name.keys())
+
+        # Detect added elements
+        added_names = new_names - old_names
+        for name in added_names:
+            element = new_by_name[name]
+            element_type = self._get_element_type(element)
+            changes.append(CodeChange(
+                change_type=ChangeType.ADDED,
+                element_type=element_type,
+                element_name=name,
+                file_path=file_path,
+                new_value=element.get("signature", ""),
+                line_number=element.get("line_number"),
+            ))
 
         # Detect deleted elements
-        for element in old_elements:
-            if element["name"] not in new_names:
+        deleted_names = old_names - new_names
+        for name in deleted_names:
+            element = old_by_name[name]
+            element_type = self._get_element_type(element)
+            changes.append(CodeChange(
+                change_type=ChangeType.DELETED,
+                element_type=element_type,
+                element_name=name,
+                file_path=file_path,
+                old_value=element.get("signature", ""),
+                line_number=element.get("line_number"),
+            ))
+
+        # Detect modified elements
+        common_names = old_names & new_names
+        for name in common_names:
+            old_element = old_by_name[name]
+            new_element = new_by_name[name]
+
+            # Compare signatures
+            if old_element.get("signature") != new_element.get("signature"):
+                element_type = self._get_element_type(new_element)
                 changes.append(CodeChange(
-                    change_type=ChangeType.DELETED,
-                    element_type=DocumentationType.FUNCTION,
-                    element_name=element["name"],
+                    change_type=ChangeType.MODIFIED,
+                    element_type=element_type,
+                    element_name=name,
                     file_path=file_path,
-                    old_value=element.get("signature", ""),
+                    old_value=old_element.get("signature", ""),
+                    new_value=new_element.get("signature", ""),
+                    line_number=new_element.get("line_number"),
                 ))
 
         return changes
+
+    def compare_snapshots(
+        self,
+        old_snapshot: Dict[str, Any],
+        new_snapshot: Dict[str, Any]
+    ) -> List[CodeChange]:
+        """
+        Compare two code snapshots and detect changes.
+
+        Args:
+            old_snapshot: Previous code snapshot
+            new_snapshot: New code snapshot
+
+        Returns:
+            List of detected changes across all files
+        """
+        all_changes = []
+
+        # Get all file paths
+        old_files = set(old_snapshot.keys())
+        new_files = set(new_snapshot.keys())
+
+        # Detect new files
+        for file_path in new_files - old_files:
+            all_changes.append(CodeChange(
+                change_type=ChangeType.ADDED,
+                element_type=DocumentationType.MODULE,
+                element_name=file_path,
+                file_path=file_path,
+                new_value="<new file>",
+            ))
+
+        # Detect deleted files
+        for file_path in old_files - new_files:
+            all_changes.append(CodeChange(
+                change_type=ChangeType.DELETED,
+                element_type=DocumentationType.MODULE,
+                element_name=file_path,
+                file_path=file_path,
+                old_value="<deleted file>",
+            ))
+
+        # Compare common files
+        for file_path in old_files & new_files:
+            old_code = old_snapshot[file_path]
+            new_code = new_snapshot[file_path]
+
+            if old_code != new_code:
+                file_changes = self.detect_changes(old_code, new_code, file_path)
+                all_changes.extend(file_changes)
+
+        return all_changes
+
+    def _get_element_type(self, element: Dict[str, Any]) -> DocumentationType:
+        """
+        Get documentation type from element.
+
+        Args:
+            element: Element dictionary
+
+        Returns:
+            DocumentationType enum value
+        """
+        element_type = element.get("type", "unknown")
+
+        type_mapping = {
+            "function": DocumentationType.FUNCTION,
+            "class": DocumentationType.CLASS,
+            "method": DocumentationType.METHOD,
+            "module": DocumentationType.MODULE,
+        }
+
+        return type_mapping.get(element_type, DocumentationType.UNKNOWN)
 
     def _extract_function_info(
         self,
