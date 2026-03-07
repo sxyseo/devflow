@@ -377,16 +377,22 @@ class GitLabCI(PipelineIntegration):
 
     def get_pipeline_details(
         self,
-        run_id: str
+        run_id: str,
+        poll: bool = False,
+        timeout: int = 600,
+        interval: int = 10
     ) -> Dict[str, Any]:
         """
-        Get detailed information about a pipeline run.
+        Get detailed information about a pipeline run with optional polling.
 
         This is a GitLab-specific method that provides comprehensive
         pipeline information beyond the generic get_pipeline_status() method.
 
         Args:
             run_id: Pipeline run ID
+            poll: Whether to continuously poll until completion (default: False)
+            timeout: Maximum polling time in seconds (default: 600)
+            interval: Polling interval in seconds (default: 10)
 
         Returns:
             Dictionary containing:
@@ -411,68 +417,130 @@ class GitLabCI(PipelineIntegration):
         Raises:
             ValueError: If run_id is not found
             ConnectionError: If unable to reach GitLab API
+            TimeoutError: If polling timeout is exceeded
 
         Example:
             ```python
+            # Get current details without polling
             details = gitlab.get_pipeline_details("123456")
-            print(f"Status: {details['status']}")
-            print(f"Duration: {details['duration']}s")
+
+            # Poll until completion with custom timeout
+            details = gitlab.get_pipeline_details("123456", poll=True, timeout=300)
             ```
         """
+        start_time = time.time()
+        last_status = None
+
         try:
-            endpoint = f"/projects/{self.encoded_project_path}/pipelines/{run_id}"
-            response = self._make_request("GET", endpoint)
+            while True:
+                try:
+                    endpoint = f"/projects/{self.encoded_project_path}/pipelines/{run_id}"
+                    response = self._make_request("GET", endpoint)
 
-            # Extract pipeline information
-            gitlab_status = response.get("status", "unknown")
-            pipeline_status = self._map_status(gitlab_status)
+                    # Extract pipeline information
+                    gitlab_status = response.get("status", "unknown")
+                    pipeline_status = self._map_status(gitlab_status)
 
-            details = {
-                "id": response.get("id"),
-                "project_id": response.get("project_id"),
-                "status": pipeline_status,
-                "gitlab_status": gitlab_status,
-                "ref": response.get("ref"),
-                "sha": response.get("sha"),
-                "created_at": response.get("created_at"),
-                "updated_at": response.get("updated_at"),
-                "started_at": response.get("started_at"),
-                "finished_at": response.get("finished_at"),
-                "duration": response.get("duration"),
-                "url": response.get("web_url"),
-                "web_url": response.get("web_url"),
-                "source": response.get("source"),
-                "user": response.get("user", {}).get("name") if response.get("user") else None,
-                "variables": response.get("variables", []),
-            }
+                    details = {
+                        "id": response.get("id"),
+                        "project_id": response.get("project_id"),
+                        "status": pipeline_status,
+                        "gitlab_status": gitlab_status,
+                        "ref": response.get("ref"),
+                        "sha": response.get("sha"),
+                        "created_at": response.get("created_at"),
+                        "updated_at": response.get("updated_at"),
+                        "started_at": response.get("started_at"),
+                        "finished_at": response.get("finished_at"),
+                        "duration": response.get("duration"),
+                        "url": response.get("web_url"),
+                        "web_url": response.get("web_url"),
+                        "source": response.get("source"),
+                        "user": response.get("user", {}).get("name") if response.get("user") else None,
+                        "variables": response.get("variables", []),
+                    }
 
-            # Fetch job information if available
-            try:
-                jobs_endpoint = f"/projects/{self.encoded_project_path}/pipelines/{run_id}/jobs"
-                jobs_response = self._make_request("GET", jobs_endpoint, params={"per_page": 100})
+                    # Fetch job information if available
+                    try:
+                        jobs_endpoint = f"/projects/{self.encoded_project_path}/pipelines/{run_id}/jobs"
+                        jobs_response = self._make_request("GET", jobs_endpoint, params={"per_page": 100})
 
-                jobs = []
-                for job in jobs_response:
-                    jobs.append({
-                        "id": job.get("id"),
-                        "name": job.get("name"),
-                        "stage": job.get("stage"),
-                        "status": job.get("status"),
-                        "created_at": job.get("created_at"),
-                        "started_at": job.get("started_at"),
-                        "finished_at": job.get("finished_at"),
-                        "duration": job.get("duration"),
-                        "web_url": job.get("web_url"),
-                    })
+                        jobs = []
+                        for job in jobs_response:
+                            jobs.append({
+                                "id": job.get("id"),
+                                "name": job.get("name"),
+                                "stage": job.get("stage"),
+                                "status": job.get("status"),
+                                "created_at": job.get("created_at"),
+                                "started_at": job.get("started_at"),
+                                "finished_at": job.get("finished_at"),
+                                "duration": job.get("duration"),
+                                "web_url": job.get("web_url"),
+                            })
 
-                details["jobs"] = jobs
+                        details["jobs"] = jobs
 
-            except Exception as e:
-                # Jobs are optional - log but don't fail
-                logger.debug(f"Could not fetch job details: {e}")
-                details["jobs"] = []
+                    except Exception as e:
+                        # Jobs are optional - log but don't fail
+                        logger.debug(f"Could not fetch job details: {e}")
+                        details["jobs"] = []
 
-            return details
+                    # Log status change if polling
+                    if poll and last_status != pipeline_status:
+                        logger.info(
+                            f"Pipeline {run_id} status: {pipeline_status.name} "
+                            f"(GitLab: {gitlab_status})"
+                        )
+                        last_status = pipeline_status
+
+                    # If not polling or pipeline is complete, return details
+                    if not poll or pipeline_status in [
+                        PipelineStatus.SUCCESS,
+                        PipelineStatus.FAILED,
+                        PipelineStatus.CANCELLED
+                    ]:
+                        # Update run in active runs if present
+                        with self.lock:
+                            if run_id in self.active_runs:
+                                self.active_runs[run_id].status = pipeline_status
+                                self.active_runs[run_id].updated_at = time.time()
+
+                                # Update completed_at if pipeline finished
+                                if pipeline_status in [PipelineStatus.SUCCESS, PipelineStatus.FAILED, PipelineStatus.CANCELLED]:
+                                    if not self.active_runs[run_id].completed_at:
+                                        self.active_runs[run_id].completed_at = time.time()
+
+                        return details
+
+                    # Check timeout
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise TimeoutError(
+                            f"Pipeline {run_id} did not complete within {timeout} seconds. "
+                            f"Last status: {pipeline_status.name}"
+                        )
+
+                    # Wait before next poll
+                    time.sleep(interval)
+
+                except ValueError as e:
+                    logger.error(f"Failed to get pipeline details: {e}")
+                    raise
+                except requests.exceptions.RequestException as e:
+                    # Retry on network errors during polling
+                    if not poll:
+                        raise ConnectionError(f"Failed to reach GitLab API: {e}")
+
+                    logger.warning(f"Network error during polling, retrying: {e}")
+                    # Check timeout before retrying
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout:
+                        raise TimeoutError(
+                            f"Pipeline {run_id} did not complete within {timeout} seconds due to network errors"
+                        )
+                    # Wait before retrying
+                    time.sleep(interval)
 
         except ValueError as e:
             logger.error(f"Failed to get pipeline details: {e}")
