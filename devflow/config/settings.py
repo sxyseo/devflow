@@ -71,6 +71,60 @@ class Settings:
             "retrospective",
         ]
 
+        # Model Configuration
+        self.model_config_path = self.project_root / "devflow" / "config" / "model_config.json"
+        self.model_config = self._load_model_config()
+        self.provider_api_keys = self._load_provider_api_keys()
+
+    def _load_model_config(self) -> Dict[str, Any]:
+        """Load model configuration from model_config.json."""
+        default_config = {
+            "providers": {},
+            "task_mappings": {},
+            "agent_mappings": {},
+            "fallback_config": {
+                "enabled": True,
+                "max_attempts": 3,
+            },
+            "cost_optimization": {
+                "enabled": True,
+            },
+            "performance_tracking": {
+                "enabled": True,
+            },
+            "selection_strategy": {
+                "default": "balanced",
+            },
+        }
+
+        if self.model_config_path.exists():
+            try:
+                with open(self.model_config_path, 'r') as f:
+                    config = json.load(f)
+                    return config
+            except (json.JSONDecodeError, IOError) as e:
+                # Return default config if file is invalid
+                return default_config
+
+        return default_config
+
+    def _load_provider_api_keys(self) -> Dict[str, str]:
+        """Load API keys for enabled providers from environment variables."""
+        api_keys = {}
+
+        if not self.model_config or "providers" not in self.model_config:
+            return api_keys
+
+        for provider_id, provider_config in self.model_config.get("providers", {}).items():
+            if provider_config.get("enabled", False):
+                env_var = provider_config.get("api_key_env")
+                if env_var:
+                    api_key = os.getenv(env_var)
+                    if api_key:
+                        api_keys[provider_id] = api_key
+
+        return api_keys
+
     def ensure_directories(self):
         """Create all necessary directories."""
         dirs = [
@@ -114,6 +168,7 @@ class Settings:
             "metrics_port": self.metrics_port,
             "log_level": self.log_level,
             "bmad_agents": self.bmad_agents,
+            "model_config_path": str(self.model_config_path),
         }
 
     def save(self, path: Path = None):
