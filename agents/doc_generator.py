@@ -5,14 +5,15 @@ DevFlow - 文档生成器
 """
 
 import json
+import hashlib
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Set, Callable
+from typing import List, Dict, Optional, Set, Callable, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
 import time
 
-from devflow.docs.analyzer import DocumentationAnalyzer
+from devflow.docs.analyzer import DocumentationAnalyzer, CodeChange, ChangeType
 from devflow.docs.generator import DocumentationGenerator
 from devflow.docs.metrics import DocumentationMetrics
 
@@ -71,6 +72,20 @@ class DocumentationTask:
             self.created_at = datetime.now().isoformat()
 
 
+@dataclass
+class FileState:
+    """文件状态追踪"""
+    file_path: str
+    hash: str
+    modified_time: float
+    last_doc_update: float = None
+    metadata: Dict = None
+
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
+
+
 class DocumentationGeneratorAgent:
     """文档生成器智能代理"""
 
@@ -100,6 +115,14 @@ class DocumentationGeneratorAgent:
         self.tasks_dir = self.project_path / '.devflow' / 'tasks'
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
+        # 状态文件目录（用于增量更新）
+        self.state_dir = self.project_path / '.devflow' / 'state'
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+
+        # 文件状态缓存
+        self._file_states: Dict[str, FileState] = {}
+        self._load_file_states()
+
         # 回调函数列表
         self._callbacks: List[Callable[[DocGenerationResult], None]] = []
 
@@ -111,6 +134,147 @@ class DocumentationGeneratorAgent:
             callback: 回调函数，接收 DocGenerationResult 参数
         """
         self._callbacks.append(callback)
+
+    def _load_file_states(self):
+        """从状态文件加载文件状态"""
+        state_file = self.state_dir / 'file_states.json'
+
+        if state_file.exists():
+            try:
+                with open(state_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    for path, state_data in data.items():
+                        self._file_states[path] = FileState(**state_data)
+            except Exception as e:
+                print(f"  ⚠️  加载文件状态失败: {e}")
+                self._file_states = {}
+
+    def _save_file_states(self):
+        """保存文件状态到状态文件"""
+        state_file = self.state_dir / 'file_states.json'
+
+        try:
+            data = {
+                path: asdict(state)
+                for path, state in self._file_states.items()
+            }
+            with open(state_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"  ⚠️  保存文件状态失败: {e}")
+
+    def _calculate_file_hash(self, file_path: str) -> str:
+        """
+        计算文件内容的哈希值
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            文件的SHA256哈希值
+        """
+        try:
+            with open(file_path, 'rb') as f:
+                return hashlib.sha256(f.read()).hexdigest()
+        except Exception:
+            return ""
+
+    def _get_file_changes(self, path: str) -> List[CodeChange]:
+        """
+        获取文件变化列表
+
+        Args:
+            path: 要检查的路径
+
+        Returns:
+            变化列表
+        """
+        changes = []
+        current_time = time.time()
+
+        # 获取所有源代码文件
+        source_files = []
+        path_obj = Path(path)
+
+        # 查找Python文件
+        source_files.extend(path_obj.rglob('*.py'))
+
+        # 查找JavaScript/TypeScript文件
+        for ext in ['*.js', '*.jsx', '*.ts', '*.tsx']:
+            source_files.extend(path_obj.rglob(ext))
+
+        for file_path in source_files:
+            try:
+                file_str = str(file_path)
+                stat = file_path.stat()
+                current_hash = self._calculate_file_hash(file_str)
+
+                # 检查文件是否在状态缓存中
+                if file_str not in self._file_states:
+                    # 新文件
+                    changes.append(CodeChange(
+                        change_type=ChangeType.ADDED,
+                        element_type=DocumentationType.MODULE,
+                        element_name=file_path.name,
+                        file_path=file_str,
+                        new_value=current_hash,
+                        metadata={'size': stat.st_size}
+                    ))
+                else:
+                    # 检查是否有变化
+                    old_state = self._file_states[file_str]
+                    if old_state.hash != current_hash:
+                        changes.append(CodeChange(
+                            change_type=ChangeType.MODIFIED,
+                            element_type=DocumentationType.MODULE,
+                            element_name=file_path.name,
+                            file_path=file_str,
+                            old_value=old_state.hash,
+                            new_value=current_hash,
+                            metadata={'size': stat.st_size}
+                        ))
+
+            except Exception as e:
+                print(f"  ⚠️  检查文件变化失败 {file_path}: {e}")
+
+        # 检查删除的文件
+        for file_str in list(self._file_states.keys()):
+            if not Path(file_str).exists():
+                old_state = self._file_states[file_str]
+                changes.append(CodeChange(
+                    change_type=ChangeType.DELETED,
+                    element_type=DocumentationType.MODULE,
+                    element_name=Path(file_str).name,
+                    file_path=file_str,
+                    old_value=old_state.hash
+                ))
+                del self._file_states[file_str]
+
+        return changes
+
+    def _update_file_state(self, file_path: str):
+        """
+        更新文件状态
+
+        Args:
+            file_path: 文件路径
+        """
+        try:
+            path_obj = Path(file_path)
+            if not path_obj.exists():
+                return
+
+            stat = path_obj.stat()
+            file_hash = self._calculate_file_hash(file_path)
+
+            self._file_states[file_path] = FileState(
+                file_path=file_path,
+                hash=file_hash,
+                modified_time=stat.st_mtime,
+                last_doc_update=time.time()
+            )
+        except Exception as e:
+            print(f"  ⚠️  更新文件状态失败 {file_path}: {e}")
 
     def analyze_codebase(self, path: str = None) -> Dict:
         """
@@ -567,16 +731,18 @@ class DocumentationGeneratorAgent:
 
         return metrics
 
-    def incremental_update(self, path: str = None) -> DocGenerationResult:
+    def incremental_update(self, path: str = None, force: bool = False) -> DocGenerationResult:
         """
         增量更新文档（只更新有变化的文档）
 
         Args:
             path: 要检查的路径
+            force: 是否强制更新所有文档
 
         Returns:
             文档生成结果
         """
+        start_time = time.time()
         print("🔄 检查文档更新...")
 
         if path is None:
@@ -584,37 +750,144 @@ class DocumentationGeneratorAgent:
 
         try:
             # 检测代码变化
-            changes = self.analyzer.detect_changes(path)
+            changes = self._get_file_changes(path)
 
-            if not changes:
+            if not changes and not force:
                 print("  ✅ 没有检测到代码变化，无需更新文档")
                 return DocGenerationResult(
                     success=True,
-                    files_generated=[]
+                    files_generated=[],
+                    status=DocWorkflowStatus.COMPLETED,
+                    duration=time.time() - start_time
                 )
 
-            print(f"  📝 检测到 {len(changes)} 个文件变化")
+            if force:
+                print(f"  ⚡ 强制更新模式")
+                changes = []  # Clear changes to regenerate all
+            else:
+                print(f"  📝 检测到 {len(changes)} 个文件变化")
 
-            # 只更新变化文件的文档
-            generated_files = []
+            # 按变化类型分组
+            added_files = [c for c in changes if c.change_type == ChangeType.ADDED]
+            modified_files = [c for c in changes if c.change_type == ChangeType.MODIFIED]
+            deleted_files = [c for c in changes if c.change_type == ChangeType.DELETED]
+
+            if added_files:
+                print(f"    ➕ 新增文件: {len(added_files)}")
+            if modified_files:
+                print(f"    ✏️  修改文件: {len(modified_files)}")
+            if deleted_files:
+                print(f"    🗑️  删除文件: {len(deleted_files)}")
+
+            # 收集需要重新生成文档的文件
+            files_to_update = set()
+
+            # 直接添加变化文件
             for change in changes:
-                print(f"  更新文档: {change['file_path']}")
+                if change.change_type in [ChangeType.ADDED, ChangeType.MODIFIED]:
+                    files_to_update.add(change.file_path)
 
-                # TODO: 实现增量更新逻辑
-                # 这里应该只重新生成受影响部分的文档
+            # 如果有变化或强制更新，重新生成文档
+            generated_files = []
+            errors = []
 
-            return DocGenerationResult(
-                success=True,
-                files_generated=generated_files
+            # 分析变化的文件
+            if files_to_update or force:
+                print(f"\n  📖 分析代码库...")
+
+                # 如果强制更新，分析整个代码库
+                if force:
+                    analysis_results = self.analyze_codebase(path)
+                else:
+                    # 只分析变化的文件
+                    analysis_results = {
+                        'python_files': [],
+                        'javascript_files': [],
+                        'total_functions': 0,
+                        'total_classes': 0,
+                        'documented_functions': 0,
+                        'documented_classes': 0
+                    }
+
+                    for file_path in files_to_update:
+                        if file_path.endswith('.py'):
+                            try:
+                                result = self.analyzer.analyze_python_file(file_path)
+                                analysis_results['python_files'].append(result)
+                                analysis_results['total_functions'] += len(result.get('functions', []))
+                                analysis_results['total_classes'] += len(result.get('classes', []))
+
+                                for func in result.get('functions', []):
+                                    if func.get('has_docstring'):
+                                        analysis_results['documented_functions'] += 1
+
+                                for cls in result.get('classes', []):
+                                    if cls.get('has_docstring'):
+                                        analysis_results['documented_classes'] += 1
+
+                                # 更新文件状态
+                                self._update_file_state(file_path)
+
+                            except Exception as e:
+                                errors.append(f"分析文件失败 {file_path}: {e}")
+
+                # 重新生成API文档
+                if analysis_results.get('total_functions', 0) > 0 or analysis_results.get('total_classes', 0) > 0 or force:
+                    try:
+                        output_path = str(self.docs_dir / 'api.md')
+
+                        # 生成API文档
+                        self.generator.generate_api_docs(analysis_results, output_path)
+                        generated_files.append(output_path)
+
+                        print(f"    ✅ API文档已更新")
+
+                    except Exception as e:
+                        errors.append(f"生成API文档失败: {e}")
+
+                # 保存更新后的文件状态
+                self._save_file_states()
+
+            # 创建结果
+            result = DocGenerationResult(
+                success=len(errors) == 0,
+                files_generated=generated_files,
+                status=DocWorkflowStatus.COMPLETED if len(errors) == 0 else DocWorkflowStatus.FAILED,
+                duration=time.time() - start_time,
+                metrics={
+                    'files_changed': len(changes),
+                    'files_added': len(added_files),
+                    'files_modified': len(modified_files),
+                    'files_deleted': len(deleted_files)
+                },
+                errors=errors if errors else None
             )
+
+            print(f"\n  {'✅' if result.success else '⚠️'}  增量更新完成")
+            print(f"    生成文件: {len(generated_files)}")
+            print(f"    耗时: {result.duration:.2f}秒")
+
+            # 通知回调
+            for callback in self._callbacks:
+                callback(result)
+
+            return result
 
         except Exception as e:
             print(f"  ❌ 增量更新失败: {e}")
-            return DocGenerationResult(
+            result = DocGenerationResult(
                 success=False,
                 files_generated=[],
+                status=DocWorkflowStatus.FAILED,
+                duration=time.time() - start_time,
                 errors=[str(e)]
             )
+
+            # 通知回调即使失败
+            for callback in self._callbacks:
+                callback(result)
+
+            return result
 
 
 if __name__ == '__main__':
