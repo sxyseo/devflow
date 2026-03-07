@@ -1,0 +1,17 @@
+# DevFlow - Python Dependencies
+
+# Core
+psutil>=5.9.0
+
+# Testing (optional, for running tests on DevFlow itself)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code Quality (optional)
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Documentation (optional)
+sphinx>=6.0.0
+sphinx-rtd-theme>=1.2.0

@@ -1,87 +1,90 @@
 #!/bin/bash
 
-# cleanup-worktrees.sh - Remove old worktrees
+# cleanup-worktrees.sh - Cleanup old git worktrees
 #
-# Usage: ./cleanup-worktrees.sh [--dry-run]
+# Usage: ./cleanup-worktrees.sh [--dry-run] [--max-age-days=N]
+#
+# Examples:
+#   ./cleanup-worktrees.sh --dry-run --max-age-days=7
+#   ./cleanup-worktrees.sh --max-age-days=30
 
 set -e
 
 DRY_RUN=false
+MAX_AGE_DAYS=7
+WORKTREES_DIR="${WORKTREES_DIR:-/tmp/devflow-worktrees}"
 
-# Check for --dry-run flag
-if [ "$1" == "--dry-run" ]; then
-  DRY_RUN=true
-  echo "DRY RUN MODE - No changes will be made"
-  echo ""
-fi
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --max-age-days=*)
+            MAX_AGE_DAYS="${1#*=}"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
 
-WORKTREE_BASE="/tmp/devflow-worktrees"
-
-echo "═══════════════════════════════════════════════════════════════"
-echo "           Git Worktree Cleanup - $(date '+%Y-%m-%d %H:%M:%S')"
-echo "═══════════════════════════════════════════════════════════════"
+echo "Cleaning up git worktrees..."
+echo "  Max age: $MAX_AGE_DAYS days"
+echo "  Worktrees dir: $WORKTREES_DIR"
+echo "  Dry run: $DRY_RUN"
 echo ""
 
-# Prune git worktrees
-echo "Pruning git worktrees..."
-git worktree prune
+# List all worktrees
+WORKTREES=$(git worktree list | grep -v "bare$" | awk '{print $1}')
 
-echo ""
+CURRENT_TIME=$(date +%s)
+MAX_AGE_SECONDS=$((MAX_AGE_DAYS * 24 * 60 * 60))
+CLEANED_COUNT=0
 
-# Find worktrees older than 7 days
-if [ -d "$WORKTREE_BASE" ]; then
-  echo "Checking for worktrees older than 7 days in $WORKTREE_BASE..."
-  echo ""
-
-  # Count old worktrees
-  OLD_WORKTREES=$(find "$WORKTREE_BASE" -maxdepth 1 -type d -mtime +7 2>/dev/null | wc -l)
-
-  if [ "$OLD_WORKTREES" -eq 0 ]; then
-    echo "No old worktrees found"
-    exit 0
-  fi
-
-  echo "Found $OLD_WORKTREES old worktree(s):"
-  echo ""
-
-  # List old worktrees
-  find "$WORKTREE_BASE" -maxdepth 1 -type d -mtime +7 -print0 | while IFS= read -r -d '' worktree; do
-    if [ "$(basename "$worktree")" != "$(basename "$WORKTREE_BASE")" ]; then
-      WORKTREE_NAME=$(basename "$worktree")
-      WORKTREE_AGE=$(find "$worktree" -maxdepth 0 -mtime +7 -printf "%Td days")
-      WORKTREE_SIZE=$(du -sh "$worktree" 2>/dev/null | cut -f1)
-
-      echo "  - $WORKTREE_NAME"
-      echo "    Age: $WORKTREE_AGE"
-      echo "    Size: $WORKTREE_SIZE"
-      echo ""
+for WORKTREE in $WORKTREES; do
+    # Skip main repo
+    if [ "$WORKTREE" = "$(git rev-parse --show-toplevel)" ]; then
+        continue
     fi
-  done
 
-  if [ "$DRY_RUN" = false ]; then
-    echo "Removing old worktrees..."
-    find "$WORKTREE_BASE" -maxdepth 1 -type d -mtime +7 -print0 | while IFS= read -r -d '' worktree; do
-      if [ "$(basename "$worktree")" != "$(basename "$WORKTREE_BASE")" ]; then
-        WORKTREE_NAME=$(basename "$worktree")
-        echo "  Removing: $WORKTREE_NAME"
+    # Skip if not in worktrees directory
+    if [[ "$WORKTREE" != "$WORKTREES_DIR"/* ]]; then
+        continue
+    fi
 
-        # Remove from git first
-        git worktree remove "$worktree" 2>/dev/null || true
+    # Check if directory exists
+    if [ ! -d "$WORKTREE" ]; then
+        echo "  Pruning: $WORKTREE (directory missing)"
+        if [ "$DRY_RUN" = false ]; then
+            git worktree prune
+        fi
+        ((CLEANED_COUNT++))
+        continue
+    fi
 
-        # Then remove directory if it still exists
-        rm -rf "$worktree" 2>/dev/null || true
-      fi
-    done
+    # Check age
+    LAST_MODIFIED=$(stat -f %m "$WORKTREE" 2>/dev/null || stat -c %Y "$WORKTREE" 2>/dev/null)
+    AGE=$((CURRENT_TIME - LAST_MODIFIED))
 
-    echo ""
-    echo "✓ Cleanup complete"
-  else
-    echo "DRY RUN - No worktrees were removed"
-    echo "Run without --dry-run to actually remove them"
-  fi
-else
-  echo "No worktree directory found at $WORKTREE_BASE"
-fi
+    if [ $AGE -gt $MAX_AGE_SECONDS ]; then
+        AGE_DAYS=$((AGE / 86400))
+        echo "  Removing: $WORKTREE (age: ${AGE_DAYS} days)"
+
+        if [ "$DRY_RUN" = false ]; then
+            git worktree remove "$WORKTREE"
+        fi
+
+        ((CLEANED_COUNT++))
+    fi
+done
 
 echo ""
-echo "═══════════════════════════════════════════════════════════════"
+echo "Cleaned up $CLEANED_COUNT worktree(s)"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "(Dry run - no actual cleanup performed)"
+fi
