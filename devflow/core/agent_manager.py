@@ -16,7 +16,7 @@ import json
 from .state_tracker import StateTracker, AgentStatus, TaskStatus
 from .session_manager import SessionManager, SessionInfo
 from .model_manager import ModelManager
-from .model_selector import ModelSelector, SelectionStrategy
+from .model_selector import ModelSelector, SelectionStrategy, SelectionResult
 from ..config.settings import settings
 
 
@@ -269,3 +269,193 @@ class AgentManager:
     def get_available_agent_types(self) -> List[str]:
         """Get list of available agent types."""
         return list(self.agent_configs.keys())
+
+    def handle_model_failure(self, agent_id: str, failed_model_id: str,
+                            error: Exception = None) -> Optional[SelectionResult]:
+        """
+        Handle model failure by triggering fallback to an alternative model.
+
+        Args:
+            agent_id: Agent identifier
+            failed_model_id: Model that failed
+            error: Optional exception that caused the failure
+
+        Returns:
+            SelectionResult for fallback model if available, None otherwise
+        """
+        agent_info = self.agents.get(agent_id)
+        if not agent_info:
+            raise ValueError(f"Agent {agent_id} not found")
+
+        # Get original selection result
+        original_selection = agent_info.get("model_selection")
+        if not original_selection:
+            return None
+
+        # Get agent type and task
+        agent_type = agent_info["type"]
+        task = agent_info["task"]
+
+        # Build selection criteria for fallback
+        from .model_selector import SelectionCriteria, SelectionStrategy
+
+        # Get excluded models from agent's fallback history
+        excluded_models = agent_info.get("excluded_models", set()).copy()
+        excluded_models.add(failed_model_id)
+
+        # Create criteria based on original selection
+        criteria = SelectionCriteria(
+            task_type=self._infer_task_type(agent_type),
+            strategy=SelectionStrategy.BALANCED,
+            excluded_models=excluded_models
+        )
+
+        # Get fallback model from selector
+        fallback_result = self.model_selector.get_fallback_model(
+            current_model_id=failed_model_id,
+            criteria=criteria
+        )
+
+        if not fallback_result:
+            # No fallback available - mark agent as failed
+            self.state.update_agent_status(
+                agent_id,
+                AgentStatus.FAILED,
+                halt_reason=f"Model {failed_model_id} failed and no fallback available"
+            )
+            return None
+
+        # Update agent configuration with fallback model
+        with self.lock:
+            config = agent_info["config"]
+            config.model = fallback_result.model_id
+
+            # Update model selection result
+            agent_info["model_selection"] = fallback_result
+
+            # Track fallback history
+            fallback_history = agent_info.get("fallback_history", [])
+            fallback_history.append({
+                "from_model": failed_model_id,
+                "to_model": fallback_result.model_id,
+                "timestamp": time.time(),
+                "error": str(error) if error else "Unknown error"
+            })
+            agent_info["fallback_history"] = fallback_history
+
+            # Update excluded models
+            agent_info["excluded_models"] = excluded_models
+
+            # Increment fallback count
+            agent_info["fallback_count"] = agent_info.get("fallback_count", 0) + 1
+
+        # Log the fallback (could integrate with proper logging system)
+        print(f"Model fallback triggered for agent {agent_id}: "
+              f"{failed_model_id} -> {fallback_result.model_id}")
+
+        return fallback_result
+
+    def _infer_task_type(self, agent_type: str) -> str:
+        """
+        Infer task type from agent type.
+
+        Args:
+            agent_type: Agent type identifier
+
+        Returns:
+            Task type string
+        """
+        # Map agent types to task types
+        task_type_map = {
+            "planning": "analysis",
+            "development": "code_generation",
+            "quality": "code_review",
+        }
+
+        # Check if it's a known agent type
+        for known_agent, task_type in self._get_agent_task_mappings().items():
+            if agent_type == known_agent:
+                return task_type
+
+        return "analysis"  # Default
+
+    def _get_agent_task_mappings(self) -> Dict[str, str]:
+        """Get mappings from agent type to task type."""
+        # Planning agents
+        planning_agents = ["product-owner", "business-analyst", "architect",
+                          "ux-designer", "scrum-master"]
+
+        # Development agents
+        dev_agents = ["dev-story"]
+
+        # Quality agents
+        quality_agents = ["code-review", "qa-tester"]
+
+        mappings = {}
+        for agent in planning_agents:
+            mappings[agent] = "analysis"
+        for agent in dev_agents:
+            mappings[agent] = "code_generation"
+        for agent in quality_agents:
+            mappings[agent] = "code_review"
+
+        return mappings
+
+    def get_agent_fallback_info(self, agent_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get fallback information for an agent.
+
+        Args:
+            agent_id: Agent identifier
+
+        Returns:
+            Dictionary with fallback info, or None if agent not found
+        """
+        agent_info = self.agents.get(agent_id)
+        if not agent_info:
+            return None
+
+        return {
+            "current_model": agent_info["config"].model,
+            "fallback_count": agent_info.get("fallback_count", 0),
+            "fallback_history": agent_info.get("fallback_history", []),
+            "excluded_models": list(agent_info.get("excluded_models", set())),
+            "original_model": agent_info.get("model_selection").model_id if agent_info.get("model_selection") else None
+        }
+
+    def reset_agent_model(self, agent_id: str) -> bool:
+        """
+        Reset an agent to its original model selection.
+
+        Args:
+            agent_id: Agent identifier
+
+        Returns:
+            True if reset successful, False otherwise
+        """
+        agent_info = self.agents.get(agent_id)
+        if not agent_info:
+            return False
+
+        with self.lock:
+            # Clear fallback state
+            agent_info["excluded_models"] = set()
+            agent_info["fallback_history"] = []
+            agent_info["fallback_count"] = 0
+
+            # Reselect model from scratch
+            agent_type = agent_info["type"]
+            task = agent_info["task"]
+
+            selection_result = self.model_selector.select_model_for_agent(
+                agent_type=agent_type,
+                task=task,
+                strategy=SelectionStrategy.BALANCED
+            )
+
+            if selection_result:
+                agent_info["config"].model = selection_result.model_id
+                agent_info["model_selection"] = selection_result
+                return True
+
+        return False
