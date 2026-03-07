@@ -81,17 +81,25 @@ class Orchestrator:
         self.scheduler.start()
         print("✓ Task scheduler started")
 
-        # Load and start plugins
+        # Discover plugins
         try:
+            plugin_dirs = self.plugins.loader.discover_plugins()
+            print(f"✓ Discovered {len(plugin_dirs)} plugin(s)")
+
+            if len(plugin_dirs) > 0:
+                plugin_names = [d.name for d in plugin_dirs]
+                print(f"  Plugins: {', '.join(plugin_names)}")
+
+            # Load discovered plugins
             plugin_results = self.plugins.load_all_plugins()
             loaded_count = sum(1 for r in plugin_results if r.success)
-            print(f"✓ Loaded {loaded_count} plugins")
+            print(f"✓ Loaded {loaded_count} plugin(s)")
 
             # Start all loaded plugins
             if loaded_count > 0:
                 start_results = self.plugins.start_all_plugins()
                 started_count = sum(1 for success in start_results.values() if success)
-                print(f"✓ Started {started_count} plugins")
+                print(f"✓ Started {started_count} plugin(s)")
         except Exception as e:
             print(f"⚠ Plugin system initialization warning: {e}")
 
