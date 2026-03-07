@@ -5,6 +5,7 @@ DevFlow - Agent管理器
 """
 
 import os
+import sys
 import json
 import time
 import subprocess
@@ -13,6 +14,12 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from devflow.core.model_manager import ModelManager
+from devflow.core.model_selector import ModelSelector, SelectionStrategy
 
 class AgentType(Enum):
     CODEX = "codex"
@@ -51,34 +58,27 @@ class AgentManager:
     """Agent管理器"""
     
     def __init__(self, config_path: str = None):
-        self.project_path = Path("/Users/abel/dev/devflow")
+        self.project_path = Path(__file__).parent.parent.parent
         self.config = self._load_config(config_path)
         self.agents: Dict[str, AgentTask] = {}
         self.running_agents: Dict[str, subprocess.Popen] = {}
         self.max_parallel = self.config.get('scheduling', {}).get('max_parallel', 4)
+
+        # Initialize model manager and selector
+        self.model_manager = ModelManager()
+        self.model_selector = ModelSelector(
+            model_manager=self.model_manager,
+            config_path=self.project_path / "devflow" / "config" / "model_config.json"
+        )
         
     def _load_config(self, config_path: str) -> dict:
         """加载配置"""
         if config_path and Path(config_path).exists():
             with open(config_path) as f:
-                return yaml.safe_load(f)
-        
+                return json.load(f)
+
         # 默认配置
         return {
-            'agents': {
-                'codex': {
-                    'enabled': True,
-                    'model': 'gpt-4',
-                    'max_tasks': 3,
-                    'timeout': 3600
-                },
-                'claude-code': {
-                    'enabled': True,
-                    'model': 'claude-3-opus',
-                    'max_tasks': 3,
-                    'timeout': 3600
-                }
-            },
             'scheduling': {
                 'max_parallel': 4,
                 'retry_policy': {
@@ -119,130 +119,167 @@ class AgentManager:
         if not task:
             print(f"❌ 任务不存在: {task_id}")
             return False
-        
+
         # 检查是否超过最大并发
         if len(self.running_agents) >= self.max_parallel:
             print(f"⚠️  达到最大并发数 {self.max_parallel}，等待...")
             return False
-        
+
+        # Select model for this agent type
+        model_selection = self._get_model_for_agent(task.agent_type.value, task.description)
+        if not model_selection:
+            print(f"❌ 无法为 {task.agent_type.value} 选择模型")
+            return False
+
         print(f"🚀 执行任务: {task_id} (Agent: {task.agent_type.value})")
-        
+        print(f"   使用模型: {model_selection.model_id} ({model_selection.provider})")
+
         task.status = AgentStatus.RUNNING
         task.started_at = datetime.now().isoformat()
         self._save_task(task)
-        
+
         try:
             # 根据Agent类型执行
             if task.agent_type == AgentType.CODEX:
-                result = self._execute_codex(task)
+                result = self._execute_codex(task, model_selection.model_id)
             elif task.agent_type == AgentType.CLAUDE_CODE:
-                result = self._execute_claude_code(task)
+                result = self._execute_claude_code(task, model_selection.model_id)
             elif task.agent_type == AgentType.TASKMASTER:
-                result = self._execute_taskmaster(task)
+                result = self._execute_taskmaster(task, model_selection.model_id)
             elif task.agent_type == AgentType.BMAD:
-                result = self._execute_bmad(task)
+                result = self._execute_bmad(task, model_selection.model_id)
             else:
                 raise ValueError(f"未知Agent类型: {task.agent_type}")
-            
+
             task.status = AgentStatus.SUCCESS
             task.result = result
             task.completed_at = datetime.now().isoformat()
             print(f"✅ 任务完成: {task_id}")
+
+            # Update model metrics
+            self.model_selector.update_model_metrics(
+                model_selection.model_id,
+                latency=0,
+                success=True
+            )
             return True
-            
+
         except Exception as e:
             task.status = AgentStatus.FAILED
             task.error = str(e)
             task.retry_count += 1
             print(f"❌ 任务失败: {task_id} - {e}")
-            
+
+            # Update model metrics with failure
+            if model_selection:
+                self.model_selector.update_model_metrics(
+                    model_selection.model_id,
+                    latency=0,
+                    success=False
+                )
+
             # 重试
             if task.retry_count < task.max_retries:
                 print(f"🔄 重试任务 ({task.retry_count}/{task.max_retries})")
                 time.sleep(5 * task.retry_count)  # 指数退避
                 task.status = AgentStatus.IDLE
                 return self.execute_task(task_id)
-            
+
             return False
-        
+
         finally:
             self._save_task(task)
     
-    def _execute_codex(self, task: AgentTask) -> str:
+    def _get_model_for_agent(self, agent_type: str, task_description: str = None):
+        """Get the model for a specific agent type using ModelSelector."""
+        try:
+            selection = self.model_selector.select_model_for_agent(
+                agent_type=agent_type,
+                task=task_description,
+                strategy=SelectionStrategy.BALANCED
+            )
+            return selection
+        except Exception as e:
+            print(f"⚠️  模型选择失败: {e}")
+            return None
+
+    def _execute_codex(self, task: AgentTask, model_id: str) -> str:
         """执行Codex Agent"""
         print(f"  🤖 Codex处理: {task.description}")
-        
+
         # 检查codex是否可用
         if not self._check_command_available('codex'):
             raise Exception("Codex未安装或不可用")
-        
+
         # 构建命令
         cmd = [
             'codex',
             '--task', task.description,
             '--project', str(self.project_path),
+            '--model', model_id,
             '--auto'
         ]
-        
+
         # 执行
         result = subprocess.run(
             cmd,
             cwd=self.project_path,
             capture_output=True,
             text=True,
-            timeout=self.config['agents']['codex']['timeout']
+            timeout=3600
         )
-        
+
         if result.returncode != 0:
             raise Exception(f"Codex执行失败: {result.stderr}")
-        
+
         return result.stdout
     
-    def _execute_claude_code(self, task: AgentTask) -> str:
+    def _execute_claude_code(self, task: AgentTask, model_id: str) -> str:
         """执行Claude Code Agent"""
         print(f"  🤖 Claude Code处理: {task.description}")
-        
+
         # 检查claude-code是否可用
         if not self._check_command_available('claude-code'):
             raise Exception("Claude Code未安装或不可用")
-        
+
         # 构建命令
         cmd = [
             'claude-code',
             '--task', task.description,
-            '--project', str(self.project_path)
+            '--project', str(self.project_path),
+            '--model', model_id
         ]
-        
+
         # 执行
         result = subprocess.run(
             cmd,
             cwd=self.project_path,
             capture_output=True,
             text=True,
-            timeout=self.config['agents']['claude-code']['timeout']
+            timeout=3600
         )
-        
+
         if result.returncode != 0:
             raise Exception(f"Claude Code执行失败: {result.stderr}")
-        
+
         return result.stdout
-    
-    def _execute_taskmaster(self, task: AgentTask) -> str:
+
+    def _execute_taskmaster(self, task: AgentTask, model_id: str) -> str:
         """执行TaskMaster Agent"""
         print(f"  🤖 TaskMaster处理: {task.description}")
-        
+
         # 使用TaskMaster Skill
         from skills.taskmaster import TaskMaster
-        
+
         tm = TaskMaster(prd_path=str(self.project_path / "PRD.md"))
         tasks = tm.generate_tasks()
-        
+
         return f"生成了 {len(tasks)} 个任务"
-    
-    def _execute_bmad(self, task: AgentTask) -> str:
+
+    def _execute_bmad(self, task: AgentTask, model_id: str) -> str:
         """执行BMAD Agent"""
-        print(f"  🤖 BMAD处理: {task.description}")
-        
+        print(f"  🤖 BMAD处理: {task.description} (模型: {model_id})")
+
         # TODO: 实现BMAD执行
         time.sleep(2)  # 模拟执行
         return "BMAD执行完成"
@@ -364,15 +401,15 @@ class AgentManager:
         status = {
             'total_tasks': len(self.agents),
             'pending': len([t for t in self.agents.values() if t.status == AgentStatus.IDLE]),
-            'running': len([t for t in self.agents.values() if t.status == AgentStatus.RUNING]),
+            'running': len([t for t in self.agents.values() if t.status == AgentStatus.RUNNING]),
             'completed': len([t for t in self.agents.values() if t.status == AgentStatus.SUCCESS]),
-            'failed': len([t for t in self.agents.values() if t.status == AgentStatus.FAILED])
+            'failed': len([t for t in self.agents.values() if t.status == AgentStatus.FAILED]),
             'updated_at': datetime.now().isoformat()
         }
-        
+
         status_file = self.project_path / '.devflow' / 'status.json'
         status_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(status_file, 'w') as f:
             json.dump(status, f, indent=2)
     
@@ -381,11 +418,11 @@ class AgentManager:
         status = {
             'total': len(self.agents),
             'pending': len([t for t in self.agents.values() if t.status == AgentStatus.IDLE]),
-            'running': len([t for t in self.agents.values() if t.status == AgentStatus.RUNING]),
+            'running': len([t for t in self.agents.values() if t.status == AgentStatus.RUNNING]),
             'completed': len([t for t in self.agents.values() if t.status == AgentStatus.SUCCESS]),
             'failed': len([t for t in self.agents.values() if t.status == AgentStatus.FAILED])
         }
-        
+
         print(f"   总任务: {status['total']}")
         print(f"   待处理: {status['pending']}")
         print(f"   进行中: {status['running']}")

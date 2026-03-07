@@ -1,0 +1,59 @@
+{
+  "agents": {
+    "test-agent-1": {
+      "id": "test-agent-1",
+      "type": "dev-story",
+      "session_name": null,
+      "status": "idle",
+      "created_at": "2026-03-07T15:14:26.644956",
+      "started_at": null,
+      "completed_at": null,
+      "current_task": null,
+      "tasks_completed": 0,
+      "tasks_failed": 0,
+      "halt_reason": null
+    },
+    "agent-1": {
+      "id": "agent-1",
+      "type": "dev-story",
+      "session_name": null,
+      "status": "idle",
+      "created_at": "2026-03-07T15:14:39.624437",
+      "started_at": null,
+      "completed_at": null,
+      "current_task": null,
+      "tasks_completed": 0,
+      "tasks_failed": 0,
+      "halt_reason": null
+    },
+    "agent-2": {
+      "id": "agent-2",
+      "type": "code-review",
+      "session_name": null,
+      "status": "idle",
+      "created_at": "2026-03-07T15:14:39.624847",
+      "started_at": null,
+      "completed_at": null,
+      "current_task": null,
+      "tasks_completed": 0,
+      "tasks_failed": 0,
+      "halt_reason": null
+    },
+    "agent-3": {
+      "id": "agent-3",
+      "type": "product-owner",
+      "session_name": null,
+      "status": "idle",
+      "created_at": "2026-03-07T15:14:39.633149",
+      "started_at": null,
+      "completed_at": null,
+      "current_task": null,
+      "tasks_completed": 0,
+      "tasks_failed": 0,
+      "halt_reason": null
+    }
+  },
+  "tasks": {},
+  "workflows": {},
+  "metrics": {}
+}

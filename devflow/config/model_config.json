@@ -249,6 +249,22 @@
     "qa-tester": {
       "task_type": "analysis",
       "model_override": null
+    },
+    "codex": {
+      "task_type": "code_generation",
+      "model_override": null
+    },
+    "claude-code": {
+      "task_type": "code_generation",
+      "model_override": null
+    },
+    "taskmaster": {
+      "task_type": "analysis",
+      "model_override": null
+    },
+    "bmad": {
+      "task_type": "architecture",
+      "model_override": null
     }
   },
   "fallback_config": {
