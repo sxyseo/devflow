@@ -17,6 +17,7 @@ from .state_tracker import StateTracker, AgentStatus, TaskStatus
 from .session_manager import SessionManager
 from .agent_manager import AgentManager
 from .task_scheduler import TaskScheduler, Task, TaskPriority
+from ..monitoring.pipeline_monitor import PipelineMonitor
 from ..config.settings import settings
 
 
@@ -44,6 +45,7 @@ class Orchestrator:
         self.sessions = SessionManager()
         self.agents = AgentManager(self.state, self.sessions)
         self.scheduler = TaskScheduler(self.state, self.agents)
+        self.pipeline_monitor = PipelineMonitor(self.state, task_scheduler=self.scheduler)
 
         # Control flags
         self._running = False
@@ -78,6 +80,10 @@ class Orchestrator:
         self.scheduler.start()
         print("✓ Task scheduler started")
 
+        # Start pipeline monitor
+        self.pipeline_monitor.start()
+        print("✓ Pipeline monitor started")
+
         # Start monitoring thread
         monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         monitor_thread.start()
@@ -104,6 +110,10 @@ class Orchestrator:
         # Stop session monitoring
         self.sessions.stop_monitoring()
         print("✓ Session monitoring stopped")
+
+        # Stop pipeline monitor
+        self.pipeline_monitor.stop()
+        print("✓ Pipeline monitor stopped")
 
         # Cleanup agents
         self.agents.cleanup_all_agents()
