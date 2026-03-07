@@ -264,15 +264,23 @@ class ModelSelector:
         # Record failure
         self._record_model_failure(current_model_id)
 
-        # Add current model to excluded
-        criteria.excluded_models.add(current_model_id)
-
         # Get task mapping
         task_mapping = self.config.get("task_mappings", {}).get(criteria.task_type)
         if not task_mapping:
             return None
 
-        # Get fallback models (excluding preferred)
+        # Find and exclude the failed model reference
+        all_models = (
+            task_mapping.get("preferred_models", []) +
+            task_mapping.get("fallback_models", [])
+        )
+        for model_ref in all_models:
+            _, model_id = self._parse_model_ref(model_ref)
+            if model_id == current_model_id:
+                criteria.excluded_models.add(model_ref)
+                break
+
+        # Get fallback models
         fallback_models = task_mapping.get("fallback_models", [])
 
         for model_ref in fallback_models:
@@ -290,6 +298,12 @@ class ModelSelector:
             if not model or not model.available:
                 continue
 
+            # Check if there are more fallbacks available
+            remaining_fallbacks = [
+                m for m in fallback_models
+                if m != model_ref and m not in criteria.excluded_models
+            ]
+
             return SelectionResult(
                 model_id=model_id,
                 provider=provider_name,
@@ -297,7 +311,7 @@ class ModelSelector:
                 reason=f"Fallback model after {current_model_id} failure",
                 estimated_cost=self._estimate_task_cost(model, criteria),
                 estimated_latency=self._estimate_latency(model, criteria),
-                fallback_available=False  # No fallback for fallback
+                fallback_available=len(remaining_fallbacks) > 0
             )
 
         return None
