@@ -248,18 +248,23 @@ class GitHubActions(PipelineIntegration):
             logger.error(f"Failed to get workflow ID: {e}")
             return None
 
-    def trigger_pipeline(
+    def trigger_workflow(
         self,
+        workflow_id: str,
         branch: str = None,
-        parameters: Dict[str, Any] = None,
+        inputs: Dict[str, Any] = None,
         commit_sha: str = None
     ) -> PipelineRun:
         """
-        Trigger a GitHub Actions workflow run.
+        Trigger a specific GitHub Actions workflow via API.
+
+        This is a GitHub Actions-specific method that provides direct control
+        over workflow triggering, unlike the generic trigger_pipeline() method.
 
         Args:
+            workflow_id: The ID or filename of the workflow to trigger
             branch: Git branch to run workflow on (defaults to config branch)
-            parameters: Additional parameters for the workflow
+            inputs: Dictionary of input parameters for the workflow
             commit_sha: Specific commit SHA to trigger workflow for
 
         Returns:
@@ -268,30 +273,38 @@ class GitHubActions(PipelineIntegration):
         Raises:
             ValueError: If trigger fails due to invalid parameters
             ConnectionError: If unable to reach GitHub API
+
+        Example:
+            ```python
+            github = GitHubActions(config)
+            run = github.trigger_workflow(
+                workflow_id="ci.yml",
+                branch="main",
+                inputs={"environment": "staging"}
+            )
+            ```
         """
         branch = branch or self.config.branch
-        parameters = parameters or {}
+        inputs = inputs or {}
 
         logger.info(
-            f"Triggering GitHub Actions workflow for {self.owner}/{self.repo} "
-            f"on branch {branch}"
+            f"Triggering GitHub Actions workflow '{workflow_id}' "
+            f"for {self.owner}/{self.repo} on branch {branch}"
         )
 
         try:
-            # Get workflow ID from parameters or use default
-            workflow_name = parameters.get("workflow_name")
-            workflow_id = parameters.get("workflow_id")
-
-            if not workflow_id:
-                workflow_id = self._get_workflow_id(workflow_name)
+            # Resolve workflow_id if it's a filename
+            if not workflow_id.isdigit():
+                # It's a workflow filename, not an ID
+                workflow_id = self._get_workflow_id(workflow_id)
 
             if not workflow_id:
                 raise ValueError(
-                    f"Could not find workflow. "
-                    f"Please specify workflow_name or workflow_id in parameters."
+                    f"Could not find workflow '{workflow_id}'. "
+                    f"Please verify the workflow exists in the repository."
                 )
 
-            # Trigger workflow via workflow_dispatch
+            # Prepare workflow_dispatch payload
             endpoint = f"/repos/{self.owner}/{self.repo}/actions/workflows/{workflow_id}/dispatches"
 
             payload = {
@@ -299,9 +312,10 @@ class GitHubActions(PipelineIntegration):
             }
 
             # Add inputs if workflow supports them
-            if "inputs" in parameters:
-                payload["inputs"] = parameters["inputs"]
+            if inputs:
+                payload["inputs"] = inputs
 
+            # Trigger the workflow
             self._make_request("POST", endpoint, data=payload)
 
             # Get the latest workflow run for this branch
@@ -338,14 +352,83 @@ class GitHubActions(PipelineIntegration):
                     "event": run_data.get("event"),
                     "commit_sha": commit_sha or run_data.get("head_sha"),
                     "triggered_by": "devflow",
+                    "inputs": inputs,
                 }
             )
 
             # Register the run
             self._register_run(run)
 
-            logger.info(f"Successfully triggered workflow run {run.run_id}")
+            logger.info(
+                f"Successfully triggered workflow '{workflow_id}' "
+                f"with run ID {run.run_id}"
+            )
             return run
+
+        except ValueError as e:
+            logger.error(f"Failed to trigger workflow '{workflow_id}': {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error triggering workflow '{workflow_id}': {e}")
+            raise ConnectionError(f"Failed to trigger GitHub Actions workflow: {e}")
+
+    def trigger_pipeline(
+        self,
+        branch: str = None,
+        parameters: Dict[str, Any] = None,
+        commit_sha: str = None
+    ) -> PipelineRun:
+        """
+        Trigger a GitHub Actions workflow run (generic interface).
+
+        This method implements the base class interface and delegates to
+        trigger_workflow() for actual GitHub Actions-specific functionality.
+
+        Args:
+            branch: Git branch to run workflow on (defaults to config branch)
+            parameters: Additional parameters for the workflow.
+                      Can include workflow_name, workflow_id, or inputs
+            commit_sha: Specific commit SHA to trigger workflow for
+
+        Returns:
+            PipelineRun object with run information
+
+        Raises:
+            ValueError: If trigger fails due to invalid parameters
+            ConnectionError: If unable to reach GitHub API
+        """
+        branch = branch or self.config.branch
+        parameters = parameters or {}
+
+        logger.info(
+            f"Triggering GitHub Actions workflow for {self.owner}/{self.repo} "
+            f"on branch {branch}"
+        )
+
+        try:
+            # Extract workflow identifier from parameters
+            workflow_identifier = (
+                parameters.get("workflow_id") or
+                parameters.get("workflow_name") or
+                self._get_workflow_id()
+            )
+
+            if not workflow_identifier:
+                raise ValueError(
+                    f"Could not determine workflow to trigger. "
+                    f"Please specify workflow_name or workflow_id in parameters."
+                )
+
+            # Extract inputs if provided
+            inputs = parameters.get("inputs", {})
+
+            # Delegate to trigger_workflow
+            return self.trigger_workflow(
+                workflow_id=workflow_identifier,
+                branch=branch,
+                inputs=inputs,
+                commit_sha=commit_sha
+            )
 
         except ValueError as e:
             logger.error(f"Failed to trigger workflow: {e}")
