@@ -22,7 +22,7 @@ from ..config.settings import settings
 class AgentConfig:
     """Configuration for an agent."""
     agent_type: str
-    model: str = "claude-3-5-sonnet-20241022"
+    model: Optional[str] = None  # Model selected dynamically via ModelSelector
     max_tasks: int = 1
     timeout: int = 3600
     skills: List[str] = field(default_factory=list)
