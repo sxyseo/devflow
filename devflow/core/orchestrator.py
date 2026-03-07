@@ -165,6 +165,7 @@ class Orchestrator:
         4. UX Designer - UX specifications
         5. Scrum Master - Stories breakdown
         6. Readiness Check - GO/NO-GO decision
+        7. Documentation Generator - Comprehensive documentation
         """
         task_ids = []
 
@@ -254,6 +255,22 @@ class Orchestrator:
                 "docs_dir": f"{settings.workspace_dir}/{project_id}/.taskmaster/docs/",
                 "stories_dir": f"{settings.workspace_dir}/{project_id}/.taskmaster/stories/",
                 "output_path": f"{settings.workspace_dir}/{project_id}/.taskmaster/docs/readiness-check.md",
+            }
+        )
+        task_ids.append(task_id)
+
+        # Task 7: Documentation Generation (depends on Readiness Check)
+        task_id = self.scheduler.create_task(
+            task_type="documentation",
+            description="Generate comprehensive project documentation",
+            agent_type="documentation-generator",
+            priority=TaskPriority.MEDIUM.value,
+            dependencies=[task_ids[5]],
+            input_data={
+                "project_id": project_id,
+                "docs_dir": f"{settings.workspace_dir}/{project_id}/.taskmaster/docs/",
+                "stories_dir": f"{settings.workspace_dir}/{project_id}/.taskmaster/stories/",
+                "output_dir": f"{settings.workspace_dir}/{project_id}/docs/",
             }
         )
         task_ids.append(task_id)
@@ -364,6 +381,100 @@ class Orchestrator:
         task_ids.append(task_id)
 
         return workflow_id
+
+    def run_documentation_generation(
+        self,
+        project_id: str,
+        input_paths: Dict[str, str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate documentation for a project.
+
+        Creates comprehensive documentation including API reference,
+        architecture documentation, and getting started guides.
+
+        Args:
+            project_id: Project identifier
+            input_paths: Optional dictionary with paths to documentation sources
+                        (docs_dir, stories_dir, source_dir)
+
+        Returns:
+            Dictionary with generation results including output paths
+        """
+        project_dir = settings.workspace_dir / project_id
+
+        # Default paths if not provided
+        if input_paths is None:
+            input_paths = {
+                "docs_dir": str(project_dir / ".taskmaster" / "docs"),
+                "stories_dir": str(project_dir / ".taskmaster" / "stories"),
+                "source_dir": str(project_dir / "src"),
+            }
+
+        output_dir = project_dir / "docs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"\n📚 Generating Documentation for: {project_id}")
+        print("=" * 60)
+
+        try:
+            # Import here to avoid circular dependencies
+            from ..docs.analyzer import CodeAnalyzer
+            from ..docs.generator import DocumentationSection
+
+            # Analyze the project structure
+            analyzer = CodeAnalyzer()
+            source_dir = Path(input_paths.get("source_dir", str(project_dir / "src")))
+
+            if source_dir.exists():
+                print(f"Analyzing source code in: {source_dir}")
+                analyzed_code = analyzer.analyze_project(str(source_dir))
+            else:
+                print(f"Source directory not found, generating docs from planning artifacts")
+                analyzed_code = {"modules": [], "classes": [], "functions": []}
+
+            # Generate documentation sections
+            sections = [
+                DocumentationSection.GETTING_STARTED,
+                DocumentationSection.ARCHITECTURE,
+            ]
+
+            # Add API reference if we have code
+            if analyzed_code.get("modules") or analyzed_code.get("classes"):
+                sections.append(DocumentationSection.API_REFERENCE)
+
+            # Generate documentation
+            print(f"Generating documentation sections: {[s.value for s in sections]}")
+            result = self.docs_generator.generate_documentation(
+                analyzed_code=analyzed_code,
+                sections=sections
+            )
+
+            # Write documentation
+            output_path = output_dir / "docs.md"
+            with open(output_path, "w") as f:
+                f.write(result.content)
+
+            print(f"✓ Documentation generated successfully")
+            print(f"  Output: {output_path}")
+            print(f"  Sections: {', '.join(result.sections)}")
+            print("=" * 60)
+
+            return {
+                "project_id": project_id,
+                "output_path": str(output_path),
+                "sections": result.sections,
+                "format": result.format.value,
+                "status": "success",
+            }
+
+        except Exception as e:
+            print(f"✗ Documentation generation failed: {e}")
+            return {
+                "project_id": project_id,
+                "status": "failed",
+                "error": str(e),
+            }
 
     def _monitor_loop(self):
         """Main monitoring loop."""
