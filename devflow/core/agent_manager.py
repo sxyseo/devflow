@@ -16,6 +16,8 @@ import json
 from .state_tracker import StateTracker, AgentStatus, TaskStatus
 from .session_manager import SessionManager, SessionInfo
 from ..config.settings import settings
+from ..plugins.plugin_registry import PluginRegistry
+from ..plugins.agent_plugin import AgentPlugin
 
 
 @dataclass
@@ -40,12 +42,65 @@ class AgentManager:
     - Agent cleanup and resource management
     """
 
-    def __init__(self, state_tracker: StateTracker, session_manager: SessionManager):
+    def __init__(self, state_tracker: StateTracker, session_manager: SessionManager,
+                 plugin_registry: PluginRegistry = None):
         self.state = state_tracker
         self.sessions = session_manager
         self.agents: Dict[str, Dict[str, Any]] = {}
         self.agent_configs: Dict[str, AgentConfig] = self._load_agent_configs()
+        self.plugin_registry = plugin_registry or PluginRegistry()
         self.lock = threading.Lock()
+
+    def register_agent_type(self, agent_type: str, config: Dict[str, Any] = None,
+                            agent_class: Type = None) -> None:
+        """
+        Register a custom agent type from a plugin.
+
+        Args:
+            agent_type: Unique identifier for the agent type
+            config: Optional agent configuration dictionary
+            agent_class: Optional custom agent class
+        """
+        if config is None:
+            config = {}
+
+        # Convert dict config to AgentConfig
+        agent_config = AgentConfig(
+            agent_type=agent_type,
+            model=config.get("model", "claude-3-5-sonnet-20241022"),
+            max_tasks=config.get("max_tasks", 1),
+            timeout=config.get("timeout", 3600),
+            skills=config.get("skills", []),
+            system_prompt=config.get("system_prompt", "")
+        )
+
+        self.agent_configs[agent_type] = agent_config
+
+    def load_agent_types_from_plugins(self) -> int:
+        """
+        Load agent types from registered plugins.
+
+        Returns:
+            Number of agent types loaded from plugins
+        """
+        if not self.plugin_registry:
+            return 0
+
+        agent_plugins = self.plugin_registry.get_plugins_by_type("agent")
+        loaded_count = 0
+
+        for plugin in agent_plugins:
+            try:
+                # Register the agent type from the plugin
+                if hasattr(plugin, 'register_agent'):
+                    plugin.register_agent(self)
+                    loaded_count += 1
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to load agent plugin {plugin.get_metadata().name}: {e}")
+
+        return loaded_count
 
     def _load_agent_configs(self) -> Dict[str, AgentConfig]:
         """Load agent configurations."""
@@ -248,3 +303,44 @@ class AgentManager:
     def get_available_agent_types(self) -> List[str]:
         """Get list of available agent types."""
         return list(self.agent_configs.keys())
+
+    def get_agent_type_config(self, agent_type: str) -> Optional[AgentConfig]:
+        """
+        Get configuration for a specific agent type.
+
+        Args:
+            agent_type: Type of agent to get configuration for
+
+        Returns:
+            AgentConfig object or None if not found
+        """
+        return self.agent_configs.get(agent_type)
+
+    def has_agent_type(self, agent_type: str) -> bool:
+        """
+        Check if an agent type is available.
+
+        Args:
+            agent_type: Type of agent to check
+
+        Returns:
+            True if agent type is available, False otherwise
+        """
+        return agent_type in self.agent_configs
+
+    def get_plugin_agent_types(self) -> List[str]:
+        """
+        Get list of agent types provided by plugins.
+
+        Returns:
+            List of agent type identifiers from plugins
+        """
+        if not self.plugin_registry:
+            return []
+
+        agent_plugins = self.plugin_registry.get_plugins_by_type("agent")
+        return [
+            plugin.get_agent_type()
+            for plugin in agent_plugins
+            if hasattr(plugin, 'get_agent_type')
+        ]
