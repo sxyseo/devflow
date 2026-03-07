@@ -186,13 +186,14 @@ class DocumentationMetrics:
         quality_metrics = []
 
         for element in elements:
+            docstring = element.get("docstring") or ""
             metric = QualityMetric(
                 element_type=self._get_element_type(element),
                 element_name=element.get("name", "unknown"),
                 file_path=element.get("file_path", ""),
                 line_number=element.get("line_number", 0),
                 has_docstring=element.get("docstring") is not None,
-                docstring_length=len(element.get("docstring", "")),
+                docstring_length=len(docstring),
                 has_parameters=len(element.get("parameters", [])) > 0,
                 has_return_type=element.get("return_type") is not None,
                 has_examples=self._has_examples(element),
@@ -260,7 +261,7 @@ class DocumentationMetrics:
         # Create report
         report = MetricsReport(
             timestamp=datetime.now().isoformat(),
-            codebase_path=str(path),
+            codebase_path=codebase_path,
             coverage_metrics=coverage_metrics,
             quality_metrics=quality_metrics,
             overall_coverage=overall_coverage,
