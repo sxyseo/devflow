@@ -8,6 +8,7 @@ to reduce API usage and costs.
 from .base import CacheBackend, CacheEntry
 from .response_cache import ResponseCache
 from .prompt_optimizer import PromptOptimizer, PromptStats, OptimizerConfig
+from .batch_processor import BatchProcessor, BatchableTask, Batch, BatchStrategy
 
 __all__ = [
     'CacheBackend',
@@ -16,4 +17,8 @@ __all__ = [
     'PromptOptimizer',
     'PromptStats',
     'OptimizerConfig',
+    'BatchProcessor',
+    'BatchableTask',
+    'Batch',
+    'BatchStrategy',
 ]
