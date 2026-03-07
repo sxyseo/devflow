@@ -18,6 +18,7 @@ from .session_manager import SessionManager
 from .agent_manager import AgentManager
 from .task_scheduler import TaskScheduler, Task, TaskPriority
 from ..config.settings import settings
+from ..plugins.plugin_manager import PluginManager
 
 
 class Orchestrator:
@@ -30,6 +31,7 @@ class Orchestrator:
     - Workflow orchestration
     - Session management
     - System state tracking
+    - Plugin management
 
     It's the central hub that brings all components together.
     """
@@ -44,6 +46,7 @@ class Orchestrator:
         self.sessions = SessionManager()
         self.agents = AgentManager(self.state, self.sessions)
         self.scheduler = TaskScheduler(self.state, self.agents)
+        self.plugins = PluginManager()
 
         # Control flags
         self._running = False
@@ -78,6 +81,20 @@ class Orchestrator:
         self.scheduler.start()
         print("✓ Task scheduler started")
 
+        # Load and start plugins
+        try:
+            plugin_results = self.plugins.load_all_plugins()
+            loaded_count = sum(1 for r in plugin_results if r.success)
+            print(f"✓ Loaded {loaded_count} plugins")
+
+            # Start all loaded plugins
+            if loaded_count > 0:
+                start_results = self.plugins.start_all_plugins()
+                started_count = sum(1 for success in start_results.values() if success)
+                print(f"✓ Started {started_count} plugins")
+        except Exception as e:
+            print(f"⚠ Plugin system initialization warning: {e}")
+
         # Start monitoring thread
         monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         monitor_thread.start()
@@ -108,6 +125,15 @@ class Orchestrator:
         # Cleanup agents
         self.agents.cleanup_all_agents()
         print("✓ All agents cleaned up")
+
+        # Stop and cleanup plugins
+        try:
+            self.plugins.stop_all_plugins()
+            print("✓ All plugins stopped")
+            self.plugins.cleanup_all_plugins()
+            print("✓ All plugins cleaned up")
+        except Exception as e:
+            print(f"⚠ Plugin cleanup warning: {e}")
 
         # Save final state
         self.state.save()
@@ -407,6 +433,14 @@ class Orchestrator:
         print(f"  Queue Size: {scheduler_metrics['queue_size']}")
         print(f"  In Progress: {scheduler_metrics['in_progress']}")
 
+        # Plugins
+        plugin_metrics = self.plugins.get_metrics()
+        print(f"\n🔌 Plugins:")
+        print(f"  Total: {plugin_metrics['total_plugins']}")
+        print(f"  Running: {plugin_metrics['running']}")
+        print(f"  Idle: {plugin_metrics['idle']}")
+        print(f"  Types: {plugin_metrics['plugin_types']}")
+
         print("=" * 60)
 
     def get_status(self) -> Dict[str, Any]:
@@ -415,6 +449,7 @@ class Orchestrator:
             "state": self.state.get_metrics(),
             "agents": self.agents.get_agent_metrics(),
             "scheduler": self.scheduler.get_metrics(),
+            "plugins": self.plugins.get_metrics(),
             "sessions": {
                 "active": len(self.sessions.get_active_sessions()),
                 "list": self.sessions.list_sessions(),
