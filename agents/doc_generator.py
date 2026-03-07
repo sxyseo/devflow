@@ -289,14 +289,14 @@ class DocumentationGeneratorAgent:
         if path is None:
             path = str(self.project_path)
 
-        print(f"📖 分析代码库: {path}")
+        print(f"📖 Analyzing codebase: {path}")
 
-        # 分析Python代码
+        # Analyze Python code
         python_files = list(Path(path).rglob('*.py'))
-        print(f"  🔍 找到 {len(python_files)} 个Python文件")
+        print(f"  🔍 Found {len(python_files)} Python files")
 
         analysis_results = {
-            'python_files': [],
+            'files': [],
             'javascript_files': [],
             'total_functions': 0,
             'total_classes': 0,
@@ -307,37 +307,37 @@ class DocumentationGeneratorAgent:
         for py_file in python_files:
             try:
                 result = self.analyzer.analyze_python_file(str(py_file))
-                analysis_results['python_files'].append(result)
+                analysis_results['files'].append(result)
                 analysis_results['total_functions'] += len(result.get('functions', []))
                 analysis_results['total_classes'] += len(result.get('classes', []))
 
-                # 统计已文档化的元素
+                # Count documented elements
                 for func in result.get('functions', []):
-                    if func.get('has_docstring'):
+                    if func.get('docstring'):
                         analysis_results['documented_functions'] += 1
 
                 for cls in result.get('classes', []):
-                    if cls.get('has_docstring'):
+                    if cls.get('docstring'):
                         analysis_results['documented_classes'] += 1
 
             except Exception as e:
-                print(f"  ⚠️  分析文件失败 {py_file}: {e}")
+                print(f"  ⚠️  Failed to analyze {py_file}: {e}")
 
-        print(f"  ✅ 分析完成: {analysis_results['total_functions']} 个函数, {analysis_results['total_classes']} 个类")
+        print(f"  ✅ Analysis complete: {analysis_results['total_functions']} functions, {analysis_results['total_classes']} classes")
 
         return analysis_results
 
     def detect_documentation_gaps(self, analysis_results: Dict) -> List[DocumentationTask]:
         """
-        检测文档缺口
+        Detect documentation gaps.
 
         Args:
-            analysis_results: 代码分析结果
+            analysis_results: Code analysis results
 
         Returns:
-            文档更新任务列表
+            List of documentation update tasks
         """
-        print("🔍 检测文档缺口...")
+        print("🔍 Detecting documentation gaps...")
 
         tasks = []
         task_counter = 0
@@ -354,8 +354,8 @@ class DocumentationGeneratorAgent:
                 type='update-api',
                 file_path='docs/api.md',
                 priority='P1',
-                reason=f'发现 {undocumented_functions} 个未文档化的函数',
-                suggested_action='为未文档化的函数添加docstring或生成API文档'
+                reason=f'Found {undocumented_functions} undocumented functions',
+                suggested_action='Add docstrings to undocumented functions or generate API docs'
             )
             tasks.append(task)
 
@@ -371,12 +371,12 @@ class DocumentationGeneratorAgent:
                 type='update-api',
                 file_path='docs/api.md',
                 priority='P1',
-                reason=f'发现 {undocumented_classes} 个未文档化的类',
-                suggested_action='为未文档化的类添加docstring或生成API文档'
+                reason=f'Found {undocumented_classes} undocumented classes',
+                suggested_action='Add docstrings to undocumented classes or generate API docs'
             )
             tasks.append(task)
 
-        print(f"  📋 生成了 {len(tasks)} 个文档更新任务")
+        print(f"  📋 Generated {len(tasks)} documentation tasks")
 
         return tasks
 
@@ -387,7 +387,7 @@ class DocumentationGeneratorAgent:
         Args:
             tasks: 文档更新任务列表
         """
-        print("💾 保存文档更新任务...")
+        print("💾 Saving documentation tasks...")
 
         tasks_file = self.tasks_dir / 'documentation-tasks.json'
 
@@ -401,7 +401,7 @@ class DocumentationGeneratorAgent:
                 'tasks': tasks_data
             }, f, indent=2, ensure_ascii=False)
 
-        print(f"  ✅ 任务已保存: {tasks_file}")
+        print(f"  ✅ Tasks saved: {tasks_file}")
 
     def generate_api_documentation(self, source_path: str, output_path: str = None) -> DocGenerationResult:
         """
@@ -414,7 +414,7 @@ class DocumentationGeneratorAgent:
         Returns:
             文档生成结果
         """
-        print(f"📝 生成API文档...")
+        print(f"📝 Generating API documentation...")
 
         if output_path is None:
             output_path = str(self.docs_dir / 'api.md')
@@ -426,7 +426,7 @@ class DocumentationGeneratorAgent:
             # 生成文档
             self.generator.generate_api_docs(analysis, output_path)
 
-            print(f"  ✅ API文档已生成: {output_path}")
+            print(f"  ✅ API documentation generated: {output_path}")
 
             return DocGenerationResult(
                 success=True,
@@ -617,12 +617,40 @@ class DocumentationGeneratorAgent:
                         print(f"  ✗ Failed to generate API documentation")
 
                 elif doc_type == 'readme':
-                    # TODO: 实现README生成
-                    print(f"  ⚠ README generation not yet implemented")
+                    readme_path = str(Path(request.output_path) / 'README.md')
+                    try:
+                        self.generator.generate_readme(analysis_results, readme_path)
+                        generated_files.append(readme_path)
+                        print(f"  ✓ Generated README documentation")
+                    except Exception as e:
+                        errors.append(f"Failed to generate README: {e}")
+                        print(f"  ✗ Failed to generate README documentation")
 
                 elif doc_type == 'architecture':
-                    # TODO: 实现架构图生成
-                    print(f"  ⚠ Architecture documentation not yet implemented")
+                    arch_path = str(Path(request.output_path) / 'architecture.md')
+
+                    # Generate architecture documentation
+                    try:
+                        diagrams = self.generator.sync_architecture_diagrams(
+                            analysis_results,
+                            request.output_path
+                        )
+
+                        # Create architecture documentation with Mermaid diagrams
+                        arch_content = self.generator._generate_architecture_markdown(
+                            analysis_results,
+                            diagrams
+                        )
+
+                        with open(arch_path, 'w', encoding='utf-8') as f:
+                            f.write(arch_content)
+
+                        generated_files.append(arch_path)
+                        print(f"  ✓ Generated architecture documentation")
+
+                    except Exception as e:
+                        errors.append(f"Failed to generate architecture docs: {e}")
+                        print(f"  ✗ Failed to generate architecture documentation")
 
         except Exception as e:
             errors.append(str(e))
@@ -817,7 +845,7 @@ class DocumentationGeneratorAgent:
                         if file_path.endswith('.py'):
                             try:
                                 result = self.analyzer.analyze_python_file(file_path)
-                                analysis_results['python_files'].append(result)
+                                analysis_results['files'].append(result)
                                 analysis_results['total_functions'] += len(result.get('functions', []))
                                 analysis_results['total_classes'] += len(result.get('classes', []))
 

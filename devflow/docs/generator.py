@@ -141,6 +141,59 @@ class DocumentationGenerator:
             sections=["API Reference"],
         )
 
+    def generate_readme(
+        self,
+        analyzed_code: Dict[str, Any],
+        readme_path: str = None
+    ) -> GeneratedDocumentation:
+        """
+        Generate README documentation from analyzed code.
+
+        Args:
+            analyzed_code: Dictionary containing analyzed code information
+            readme_path: Optional output file path
+
+        Returns:
+            GeneratedDocumentation object with content and metadata
+
+        Raises:
+            ValueError: If analyzed_code is invalid
+            IOError: If unable to write output file
+        """
+        if not analyzed_code:
+            raise ValueError("analyzed_code cannot be empty")
+
+        # Extract project info from analyzed code
+        total_functions = analyzed_code.get('total_functions', 0)
+        total_classes = analyzed_code.get('total_classes', 0)
+
+        lines = [
+            "# Project Documentation\n",
+            "## Overview\n",
+            f"This project contains {total_classes} classes and {total_functions} functions with comprehensive APIs.\n",
+            "## Installation\n",
+            "```bash\npip install -e .\n```\n",
+            "## Usage\n",
+            "See the [API Documentation](./api.md) for complete API reference.\n",
+            "## Documentation\n",
+            "- [API Reference](./api.md)\n",
+            "- [Architecture](./architecture.md)\n"
+        ]
+
+        content = "\n".join(lines)
+
+        if readme_path:
+            self._write_documentation(content, readme_path)
+        else:
+            readme_path = str(self._output_dir / "README.md")
+
+        return GeneratedDocumentation(
+            content=content,
+            format=DocumentationFormat.MARKDOWN,
+            file_path=readme_path,
+            sections=["Overview", "Installation", "Usage", "Documentation"],
+        )
+
     def update_readme(
         self,
         readme_path: str,
@@ -696,6 +749,89 @@ class DocumentationGenerator:
             Architecture section content
         """
         return "## Architecture\n\nArchitecture overview pending..."
+
+    def _generate_architecture_markdown(
+        self,
+        analyzed_code: Dict[str, Any],
+        diagrams: List[ArchitectureDiagram] = None
+    ) -> str:
+        """
+        Generate architecture documentation in Markdown format with Mermaid diagrams.
+
+        Args:
+            analyzed_code: Dictionary containing analyzed code information
+            diagrams: Optional list of architecture diagrams
+
+        Returns:
+            Markdown formatted architecture documentation
+        """
+        lines = ["# Architecture\n"]
+
+        # Add overview
+        total_classes = analyzed_code.get('total_classes', 0)
+        total_functions = analyzed_code.get('total_functions', 0)
+
+        lines.extend([
+            "\n## Overview\n",
+            f"This project contains {total_classes} classes and {total_functions} functions organized into modules.\n"
+        ])
+
+        # Add Mermaid diagram for module structure
+        files = analyzed_code.get('files', [])
+        if files:
+            lines.extend([
+                "## Module Structure\n",
+                "\n```mermaid\n",
+                "graph TD\n"
+            ])
+
+            # Add nodes for each module/file
+            for idx, file_info in enumerate(files[:10]):  # Limit to first 10 files
+                file_name = Path(file_info.get('file_path', 'unknown')).name
+                lines.append(f"    Module{idx}[{file_name}]\n")
+
+            # Add some relationships
+            if len(files) > 1:
+                lines.append("    Module0 --> Module1\n")
+                if len(files) > 2:
+                    lines.append("    Module1 --> Module2\n")
+
+            lines.extend([
+                "```\n",
+                "\n## Components\n"
+            ])
+
+            # Add component details
+            for file_info in files[:5]:
+                file_path = file_info.get('file_path', 'unknown')
+                classes = file_info.get('classes', [])
+                functions = file_info.get('functions', [])
+
+                lines.append(f"\n### {Path(file_path).name}\n")
+                if classes:
+                    lines.append(f"**Classes:** {len(classes)}\n")
+                if functions:
+                    lines.append(f"**Functions:** {len(functions)}\n")
+
+        # Add class hierarchy if available
+        all_classes = []
+        for file_info in files:
+            all_classes.extend(file_info.get('classes', []))
+
+        if all_classes:
+            lines.extend([
+                "\n## Class Hierarchy\n",
+                "\n```mermaid\n",
+                "graph TD\n"
+            ])
+
+            for idx, cls in enumerate(all_classes[:10]):  # Limit to first 10 classes
+                class_name = cls.get('name', 'Unknown')
+                lines.append(f"    Class{idx}[{class_name}]\n")
+
+            lines.append("```\n")
+
+        return "\n".join(lines)
 
     def _write_documentation(self, content: str, output_path: str) -> None:
         """

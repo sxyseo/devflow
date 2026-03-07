@@ -70,14 +70,14 @@ def test_analyze_phase(agent, source_path):
         analysis = agent.analyze_codebase(source_path)
 
         # Verify analysis results
-        assert 'python_files' in analysis, "Missing 'python_files' in analysis results"
+        assert 'files' in analysis, "Missing 'files' in analysis results"
         assert 'total_functions' in analysis, "Missing 'total_functions' in analysis results"
         assert 'total_classes' in analysis, "Missing 'total_classes' in analysis results"
 
         print_success(f"Analysis complete")
         print_success(f"  - Found {analysis['total_functions']} functions")
         print_success(f"  - Found {analysis['total_classes']} classes")
-        print_success(f"  - Analyzed {len(analysis['python_files'])} Python files")
+        print_success(f"  - Analyzed {len(analysis['files'])} Python files")
 
         return True, analysis
 
@@ -111,10 +111,22 @@ def test_generate_phase(agent, request):
         for file_path in result.files_generated:
             print_success(f"  - {file_path}")
 
-        # Verify generated file exists and is not empty
+        # Verify generated file exists and has meaningful content
         for file_path in result.files_generated:
             assert os.path.exists(file_path), f"Generated file does not exist: {file_path}"
-            assert os.path.getsize(file_path) > 0, f"Generated file is empty: {file_path}"
+
+            # Check file has meaningful content
+            with open(file_path, 'r') as f:
+                content = f.read()
+
+            assert len(content) > 100, f"File too short ({len(content)} bytes): {file_path}"
+            assert "##" in content, f"Missing sections in {file_path}"
+
+            # For API docs specifically, check for actual API content
+            if 'api' in os.path.basename(file_path).lower():
+                assert ("Class:" in content or "Function:" in content or "## File:" in content), \
+                    f"Missing API documentation in {file_path}"
+
             print_success(f"  - File validation passed: {file_path}")
 
         return True, result
@@ -146,11 +158,15 @@ def test_validate_phase(agent, generated_files):
                 all_valid = False
                 continue
 
-            # Check file has content
+            # Check file has meaningful content
             with open(file_path, 'r') as f:
                 content = f.read()
-                if len(content) < 10:
-                    print_warning(f"File has very little content: {file_path}")
+                if len(content) < 100:
+                    print_error(f"File has very little content ({len(content)} bytes): {file_path}")
+                    all_valid = False
+                elif "##" not in content:
+                    print_error(f"File missing sections: {file_path}")
+                    all_valid = False
                 else:
                     print_success(f"File validated: {file_path}")
 
