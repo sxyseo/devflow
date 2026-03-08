@@ -38,5 +38,10 @@
     "ux-review",
     "qa-tester",
     "retrospective"
-  ]
+  ],
+  "cache_enabled": true,
+  "cache_dir": "/Users/abel/dev/devflow/.devflow/cache",
+  "cache_ttl": 3600,
+  "cache_max_size_mb": 500,
+  "cache_backend": "file"
 }
