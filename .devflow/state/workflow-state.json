@@ -1,5 +1,12 @@
 {
-  "active_run": {},
+  "active_run": {
+    "run_id": "run-20260309-075359",
+    "spec": "openclaw-autonomy",
+    "task_id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+    "status": "in_progress",
+    "started_at": "2026-03-09T07:53:59.117335",
+    "last_updated": "2026-03-09T07:53:59.117337"
+  },
   "runs": {
     "run-20260309-054500": {
       "run_id": "run-20260309-054500",
@@ -20,6 +27,14 @@
       "last_updated": "2026-03-09T06:44:00.000000",
       "completed_at": "2026-03-09T07:48:18.557674",
       "error": "Task timeout: No execution engine running. Task was in progress with no output generated."
+    },
+    "run-20260309-075359": {
+      "run_id": "run-20260309-075359",
+      "spec": "openclaw-autonomy",
+      "task_id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "status": "in_progress",
+      "started_at": "2026-03-09T07:53:59.117335",
+      "last_updated": "2026-03-09T07:53:59.117337"
     }
   }
 }
