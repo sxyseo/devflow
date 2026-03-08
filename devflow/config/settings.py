@@ -71,6 +71,13 @@ class Settings:
             "retrospective",
         ]
 
+        # Cache Settings
+        self.cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+        self.cache_dir = self.project_root / ".devflow" / "cache"
+        self.cache_ttl = int(os.getenv("CACHE_TTL", "3600"))  # 1 hour in seconds
+        self.cache_max_size_mb = int(os.getenv("CACHE_MAX_SIZE_MB", "500"))
+        self.cache_backend = os.getenv("CACHE_BACKEND", "file")
+
     def ensure_directories(self):
         """Create all necessary directories."""
         dirs = [
@@ -79,6 +86,7 @@ class Settings:
             self.logs_dir,
             self.state_dir,
             self.worktrees_dir,
+            self.cache_dir,
         ]
 
         for directory in dirs:
@@ -114,6 +122,11 @@ class Settings:
             "metrics_port": self.metrics_port,
             "log_level": self.log_level,
             "bmad_agents": self.bmad_agents,
+            "cache_enabled": self.cache_enabled,
+            "cache_dir": str(self.cache_dir),
+            "cache_ttl": self.cache_ttl,
+            "cache_max_size_mb": self.cache_max_size_mb,
+            "cache_backend": self.cache_backend,
         }
 
     def save(self, path: Path = None):
