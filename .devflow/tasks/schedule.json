@@ -1,0 +1,94 @@
+{
+  "scheduled_at": "2026-03-08T09:46:49.058324",
+  "total_tasks": 8,
+  "tasks": [
+    {
+      "id": "todo-0",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": "agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:48.479952",
+      "assigned_agent": "codex",
+      "scheduled_at": "2026-03-08T09:46:49.058259"
+    },
+    {
+      "id": "todo-1",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": "agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:48.479976",
+      "assigned_agent": "claude-code",
+      "scheduled_at": "2026-03-08T09:46:49.058260"
+    },
+    {
+      "id": "todo-2",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": "agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:48.479988",
+      "assigned_agent": "taskmaster",
+      "scheduled_at": "2026-03-08T09:46:49.058261"
+    },
+    {
+      "id": "todo-3",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:48.480161",
+      "assigned_agent": "codex",
+      "scheduled_at": "2026-03-08T09:46:49.058262"
+    },
+    {
+      "id": "todo-4",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:48.480171",
+      "assigned_agent": "claude-code",
+      "scheduled_at": "2026-03-08T09:46:49.058263"
+    },
+    {
+      "id": "todo-5",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:48.480180",
+      "assigned_agent": "taskmaster",
+      "scheduled_at": "2026-03-08T09:46:49.058263"
+    },
+    {
+      "id": "todo-6",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:48.480188",
+      "assigned_agent": "codex",
+      "scheduled_at": "2026-03-08T09:46:49.058264"
+    },
+    {
+      "id": "todo-7",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": "agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:48.480367",
+      "assigned_agent": "claude-code",
+      "scheduled_at": "2026-03-08T09:46:49.058265"
+    }
+  ]
+}

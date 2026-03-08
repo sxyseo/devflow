@@ -1,0 +1,687 @@
+{
+  "total": 75,
+  "by_priority": {
+    "P2": 75
+  },
+  "by_type": {
+    "todo": 75
+  },
+  "tasks": [
+    {
+      "id": "todo-0",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": "agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.491984"
+    },
+    {
+      "id": "todo-1",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": "agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.492017"
+    },
+    {
+      "id": "todo-2",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": "agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.492027"
+    },
+    {
+      "id": "todo-3",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.492177"
+    },
+    {
+      "id": "todo-4",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.492187"
+    },
+    {
+      "id": "todo-5",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.492195"
+    },
+    {
+      "id": "todo-6",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": "agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.492202"
+    },
+    {
+      "id": "todo-7",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": "agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.492357"
+    },
+    {
+      "id": "todo-8",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.497694"
+    },
+    {
+      "id": "todo-9",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.497726"
+    },
+    {
+      "id": "todo-10",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.497739"
+    },
+    {
+      "id": "todo-11",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.497893"
+    },
+    {
+      "id": "todo-12",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.497907"
+    },
+    {
+      "id": "todo-13",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.497919"
+    },
+    {
+      "id": "todo-14",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.497930"
+    },
+    {
+      "id": "todo-15",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".devflow/worktrees/openclaw-autonomy/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.498077"
+    },
+    {
+      "id": "todo-16",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.522318"
+    },
+    {
+      "id": "todo-17",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.522343"
+    },
+    {
+      "id": "todo-18",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.522354"
+    },
+    {
+      "id": "todo-19",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.522468"
+    },
+    {
+      "id": "todo-20",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.522480"
+    },
+    {
+      "id": "todo-21",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.522489"
+    },
+    {
+      "id": "todo-22",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.522499"
+    },
+    {
+      "id": "todo-23",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/021-advanced-documentation-generator/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.522614"
+    },
+    {
+      "id": "todo-24",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.526982"
+    },
+    {
+      "id": "todo-25",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.527000"
+    },
+    {
+      "id": "todo-26",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.527012"
+    },
+    {
+      "id": "todo-27",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.527125"
+    },
+    {
+      "id": "todo-28",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.527136"
+    },
+    {
+      "id": "todo-29",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.527145"
+    },
+    {
+      "id": "todo-30",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.527155"
+    },
+    {
+      "id": "todo-31",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/002-comprehensive-test-suite/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.527268"
+    },
+    {
+      "id": "todo-32",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.530582"
+    },
+    {
+      "id": "todo-33",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.530594"
+    },
+    {
+      "id": "todo-34",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.530604"
+    },
+    {
+      "id": "todo-35",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.530703"
+    },
+    {
+      "id": "todo-36",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.530714"
+    },
+    {
+      "id": "todo-37",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.530723"
+    },
+    {
+      "id": "todo-38",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.530732"
+    },
+    {
+      "id": "todo-39",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/020-enterprise-security-compliance/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.530837"
+    },
+    {
+      "id": "todo-40",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.533603"
+    },
+    {
+      "id": "todo-41",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.533614"
+    },
+    {
+      "id": "todo-42",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.533623"
+    },
+    {
+      "id": "todo-43",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.533722"
+    },
+    {
+      "id": "todo-44",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.533731"
+    },
+    {
+      "id": "todo-45",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.533740"
+    },
+    {
+      "id": "todo-46",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.533749"
+    },
+    {
+      "id": "todo-47",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.533852"
+    },
+    {
+      "id": "todo-48",
+      "type": "todo",
+      "priority": "P2",
+      "description": "Use actual timestamp",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/devflow/marketplace/marketplace_client.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.535747"
+    },
+    {
+      "id": "todo-49",
+      "type": "todo",
+      "priority": "P2",
+      "description": "Implement git source support",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/devflow/marketplace/marketplace_client.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.535759"
+    },
+    {
+      "id": "todo-50",
+      "type": "todo",
+      "priority": "P2",
+      "description": "Implement proper new plugins detection",
+      "file": ".auto-claude/worktrees/tasks/022-plugin-system/devflow/marketplace/marketplace_client.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.535769"
+    },
+    {
+      "id": "todo-51",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.537716"
+    },
+    {
+      "id": "todo-52",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.537727"
+    },
+    {
+      "id": "todo-53",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.537735"
+    },
+    {
+      "id": "todo-54",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.537829"
+    },
+    {
+      "id": "todo-55",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.537838"
+    },
+    {
+      "id": "todo-56",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.537846"
+    },
+    {
+      "id": "todo-57",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.537856"
+    },
+    {
+      "id": "todo-58",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/017-smart-api-usage-caching/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.537950"
+    },
+    {
+      "id": "todo-59",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.541574"
+    },
+    {
+      "id": "todo-60",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.541604"
+    },
+    {
+      "id": "todo-61",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.541615"
+    },
+    {
+      "id": "todo-62",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.541751"
+    },
+    {
+      "id": "todo-63",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.541763"
+    },
+    {
+      "id": "todo-64",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.541772"
+    },
+    {
+      "id": "todo-65",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.541782"
+    },
+    {
+      "id": "todo-66",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/016-ci-cd-pipeline-integration/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.541917"
+    },
+    {
+      "id": "todo-67",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u529f\u80fd\u8bf7\u6c42\u8bb0\u5f55",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/usability_improver.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.546316"
+    },
+    {
+      "id": "todo-68",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u5e94\u7528\u903b\u8f91",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/usability_improver.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.546334"
+    },
+    {
+      "id": "todo-69",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u4ece\u65e5\u5fd7\u4e2d\u7edf\u8ba1",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/usability_improver.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.546343"
+    },
+    {
+      "id": "todo-70",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u66f4\u590d\u6742\u7684\u5206\u6790",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/evolution_engine.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.546438"
+    },
+    {
+      "id": "todo-71",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0\u5b9e\u9645\u4f18\u5316",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/evolution_engine.py",
+      "occurrence": 2,
+      "created_at": "2026-03-08T09:46:35.546447"
+    },
+    {
+      "id": "todo-72",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u5386\u53f2\u6570\u636e\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/evolution_engine.py",
+      "occurrence": 3,
+      "created_at": "2026-03-08T09:46:35.546455"
+    },
+    {
+      "id": "todo-73",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u57fa\u4e8e\u4efb\u52a1\u590d\u6742\u5ea6\u52a8\u6001\u8c03\u6574",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/evolution_engine.py",
+      "occurrence": 4,
+      "created_at": "2026-03-08T09:46:35.546463"
+    },
+    {
+      "id": "todo-74",
+      "type": "todo",
+      "priority": "P2",
+      "description": "\u5b9e\u73b0BMAD\u6267\u884c",
+      "file": ".auto-claude/worktrees/tasks/023-multi-model-support/agents/agent_manager.py",
+      "occurrence": 1,
+      "created_at": "2026-03-08T09:46:35.546566"
+    }
+  ],
+  "created_at": "2026-03-08T09:46:36.131530"
+}

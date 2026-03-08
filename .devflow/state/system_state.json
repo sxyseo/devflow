@@ -1,0 +1,211 @@
+{
+  "agents": {},
+  "tasks": {
+    "9bf4a80b-176b-4ea5-a93a-db22cdbec405": {
+      "id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "type": "planning",
+      "description": "Generate product brief for: OpenClaw \u81ea\u6cbb\u5f00\u53d1 Agent - \u81ea\u52a8\u8fed\u4ee3\u3001\u81ea\u52a8\u8fdb\u5316\u3001\u81ea\u52a8\u5b66\u4e60\u3001\u81ea\u52a8\u4fee\u590d Bug",
+      "priority": 2,
+      "dependencies": [],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:21:12.395591",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "210db923-8ebe-4eff-b02f-af9cea2c8891": {
+      "id": "210db923-8ebe-4eff-b02f-af9cea2c8891",
+      "type": "planning",
+      "description": "Create PRD with user journeys",
+      "priority": 2,
+      "dependencies": [
+        "9bf4a80b-176b-4ea5-a93a-db22cdbec405"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:21:12.395727",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "0e715a85-e99e-4669-a87a-1da6b3530960": {
+      "id": "0e715a85-e99e-4669-a87a-1da6b3530960",
+      "type": "planning",
+      "description": "Design system architecture",
+      "priority": 2,
+      "dependencies": [
+        "210db923-8ebe-4eff-b02f-af9cea2c8891"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:21:12.395851",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "7b1816b9-89e3-437e-a5a5-a9294881a0a0": {
+      "id": "7b1816b9-89e3-437e-a5a5-a9294881a0a0",
+      "type": "planning",
+      "description": "Create UX specifications",
+      "priority": 2,
+      "dependencies": [
+        "210db923-8ebe-4eff-b02f-af9cea2c8891"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:21:12.395946",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "d48dd753-b045-4c7f-8f9c-dbc498e837fe": {
+      "id": "d48dd753-b045-4c7f-8f9c-dbc498e837fe",
+      "type": "planning",
+      "description": "Break down into epics and stories",
+      "priority": 2,
+      "dependencies": [
+        "210db923-8ebe-4eff-b02f-af9cea2c8891",
+        "0e715a85-e99e-4669-a87a-1da6b3530960",
+        "7b1816b9-89e3-437e-a5a5-a9294881a0a0"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:21:12.396041",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "057e4039-2285-4199-9566-3728938e2034": {
+      "id": "057e4039-2285-4199-9566-3728938e2034",
+      "type": "planning",
+      "description": "Perform readiness check and GO/NO-GO decision",
+      "priority": 1,
+      "dependencies": [
+        "d48dd753-b045-4c7f-8f9c-dbc498e837fe"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:21:12.396140",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "1c212ed9-c766-44b9-bdbf-be8b6c9a4f58": {
+      "id": "1c212ed9-c766-44b9-bdbf-be8b6c9a4f58",
+      "type": "development",
+      "description": "Create story file for 9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "priority": 2,
+      "dependencies": [],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:22:02.887215",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "0adcf958-bddc-429d-89fc-20c48f90a4f7": {
+      "id": "0adcf958-bddc-429d-89fc-20c48f90a4f7",
+      "type": "development",
+      "description": "Implement story 9bf4a80b-176b-4ea5-a93a-db22cdbec405 with TDD",
+      "priority": 2,
+      "dependencies": [
+        "1c212ed9-c766-44b9-bdbf-be8b6c9a4f58"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:22:02.887542",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "541927e9-1bef-47b9-a6b7-1ef6e4d0c50a": {
+      "id": "541927e9-1bef-47b9-a6b7-1ef6e4d0c50a",
+      "type": "quality",
+      "description": "Review implementation of 9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "priority": 2,
+      "dependencies": [
+        "0adcf958-bddc-429d-89fc-20c48f90a4f7"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:22:02.887726",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "5d555f68-7494-499a-b071-9048b7f2b3a8": {
+      "id": "5d555f68-7494-499a-b071-9048b7f2b3a8",
+      "type": "quality",
+      "description": "Review UX compliance for 9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "priority": 3,
+      "dependencies": [
+        "0adcf958-bddc-429d-89fc-20c48f90a4f7"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:22:02.887888",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "636b5879-0bc8-4d29-915e-2c72bb102256": {
+      "id": "636b5879-0bc8-4d29-915e-2c72bb102256",
+      "type": "quality",
+      "description": "Execute tests for 9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "priority": 1,
+      "dependencies": [
+        "0adcf958-bddc-429d-89fc-20c48f90a4f7"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:22:02.888036",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    },
+    "64be5d94-c207-4819-b9ca-71cf1c411a36": {
+      "id": "64be5d94-c207-4819-b9ca-71cf1c411a36",
+      "type": "quality",
+      "description": "Capture learnings for 9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "priority": 4,
+      "dependencies": [
+        "541927e9-1bef-47b9-a6b7-1ef6e4d0c50a",
+        "5d555f68-7494-499a-b071-9048b7f2b3a8",
+        "636b5879-0bc8-4d29-915e-2c72bb102256"
+      ],
+      "status": "pending",
+      "assigned_to": null,
+      "created_at": "2026-03-07T13:22:02.888193",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "retry_count": 0
+    }
+  },
+  "workflows": {},
+  "metrics": {}
+}

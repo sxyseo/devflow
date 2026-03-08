@@ -366,7 +366,7 @@ class AgentManager:
             'pending': len([t for t in self.agents.values() if t.status == AgentStatus.IDLE]),
             'running': len([t for t in self.agents.values() if t.status == AgentStatus.RUNING]),
             'completed': len([t for t in self.agents.values() if t.status == AgentStatus.SUCCESS]),
-            'failed': len([t for t in self.agents.values() if t.status == AgentStatus.FAILED])
+            'failed': len([t for t in self.agents.values() if t.status == AgentStatus.FAILED]),
             'updated_at': datetime.now().isoformat()
         }
         
