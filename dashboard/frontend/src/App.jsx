@@ -19,6 +19,7 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import TaskQueue from './components/TaskQueue';
 
 ChartJS.register(
   CategoryScale,
@@ -170,6 +171,12 @@ function App() {
         >
           Tasks
         </button>
+        <button
+          className={activeTab === 'queue' ? 'active' : ''}
+          onClick={() => setActiveTab('queue')}
+        >
+          Task Queue
+        </button>
       </nav>
 
       <main>
@@ -279,6 +286,10 @@ function App() {
               </table>
             )}
           </div>
+        )}
+
+        {activeTab === 'queue' && (
+          <TaskQueue />
         )}
       </main>
     </div>
