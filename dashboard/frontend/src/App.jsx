@@ -20,6 +20,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import TaskQueue from './components/TaskQueue';
+import AgentHistory from './components/AgentHistory';
 
 ChartJS.register(
   CategoryScale,
@@ -177,6 +178,12 @@ function App() {
         >
           Task Queue
         </button>
+        <button
+          className={activeTab === 'history' ? 'active' : ''}
+          onClick={() => setActiveTab('history')}
+        >
+          Agent History
+        </button>
       </nav>
 
       <main>
@@ -290,6 +297,10 @@ function App() {
 
         {activeTab === 'queue' && (
           <TaskQueue />
+        )}
+
+        {activeTab === 'history' && (
+          <AgentHistory />
         )}
       </main>
     </div>
