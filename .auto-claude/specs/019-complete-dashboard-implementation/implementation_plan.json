@@ -1,0 +1,577 @@
+{
+  "feature": "Complete Dashboard Implementation",
+  "description": "Finish the web dashboard with full monitoring, control, and visualization capabilities including real-time progress, task queue visualization, agent status history, commit tracking, and cost metrics.",
+  "workflow_type": "feature",
+  "workflow_rationale": "This is a feature implementation that spans multiple services (Python core, Node.js backend, React frontend). The phases follow service dependency order: core extensions → backend APIs → frontend components → integration.",
+  "phases": [
+    {
+      "id": "phase-1-core-extensions",
+      "name": "Python Core Extensions",
+      "type": "implementation",
+      "description": "Add git commit tracking and cost tracking to the core Python system to provide data for the dashboard",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "Create git commit tracker module",
+          "service": "python_core",
+          "files_to_create": [
+            "devflow/utils/git_tracker.py"
+          ],
+          "files_to_modify": [],
+          "patterns_from": [
+            "devflow/core/state_tracker.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "python3 -c \"from devflow.utils.git_tracker import GitTracker; print('GitTracker imported successfully')\"",
+            "expected": "GitTracker imported successfully"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "Create cost tracker module",
+          "service": "python_core",
+          "files_to_create": [
+            "devflow/utils/cost_tracker.py"
+          ],
+          "files_to_modify": [],
+          "patterns_from": [
+            "devflow/core/state_tracker.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "python3 -c \"from devflow.utils.cost_tracker import CostTracker; print('CostTracker imported successfully')\"",
+            "expected": "CostTracker imported successfully"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "Integrate git and cost tracking into state tracker",
+          "service": "python_core",
+          "files_to_modify": [
+            "devflow/core/state_tracker.py"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "devflow/core/state_tracker.py"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "python3 -c \"from devflow.core.state_tracker import StateTracker; s = StateTracker(); print('StateTracker with tracking enabled')\"",
+            "expected": "StateTracker with tracking enabled"
+          },
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-backend-api",
+      "name": "Backend API Extensions",
+      "type": "implementation",
+      "description": "Add new API endpoints for commit history, cost metrics, and manual controls",
+      "depends_on": [
+        "phase-1-core-extensions"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "Create commit history API endpoint",
+          "service": "backend",
+          "files_to_create": [
+            "dashboard/backend/routes/commits.js"
+          ],
+          "files_to_modify": [
+            "dashboard/backend/server.js"
+          ],
+          "patterns_from": [
+            "dashboard/backend/server.js"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:3001/api/commits",
+            "expected_status": 200
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "Create cost metrics API endpoint",
+          "service": "backend",
+          "files_to_create": [
+            "dashboard/backend/routes/costs.js"
+          ],
+          "files_to_modify": [
+            "dashboard/backend/server.js"
+          ],
+          "patterns_from": [
+            "dashboard/backend/server.js"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "GET",
+            "url": "http://localhost:3001/api/costs",
+            "expected_status": 200
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "Create control actions API endpoint",
+          "service": "backend",
+          "files_to_create": [
+            "dashboard/backend/routes/control.js"
+          ],
+          "files_to_modify": [
+            "dashboard/backend/server.js"
+          ],
+          "patterns_from": [
+            "dashboard/backend/server.js"
+          ],
+          "verification": {
+            "type": "api",
+            "method": "POST",
+            "url": "http://localhost:3001/api/control/inject-task",
+            "body": {
+              "type": "development",
+              "description": "Test task",
+              "priority": 2
+            },
+            "expected_status": 201
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "Add WebSocket events for real-time updates",
+          "service": "backend",
+          "files_to_modify": [
+            "dashboard/backend/server.js"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "dashboard/backend/server.js"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Verify WebSocket emits 'commits-update' and 'costs-update' events"
+          },
+          "status": "completed",
+          "notes": "Added commits-update event (10s interval) and costs-update event (15s interval) with helper functions getRecentCommits() and getCostSummary(). Initial data sent on client connection."
+        }
+      ]
+    },
+    {
+      "id": "phase-3-frontend-components",
+      "name": "Frontend Components",
+      "type": "implementation",
+      "description": "Build React components for task queue visualization, agent history, commit history, cost metrics, and control panel",
+      "depends_on": [
+        "phase-2-backend-api"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "Create API utility module",
+          "service": "frontend",
+          "files_to_create": [
+            "dashboard/frontend/src/utils/api.js"
+          ],
+          "files_to_modify": [],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd dashboard/frontend && npm run build 2>&1 | grep -i 'error\\|success' || echo 'Build completed'",
+            "expected": "Build completed"
+          },
+          "status": "completed"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "Create TaskQueue visualization component",
+          "service": "frontend",
+          "files_to_create": [
+            "dashboard/frontend/src/components/TaskQueue.jsx"
+          ],
+          "files_to_modify": [
+            "dashboard/frontend/src/App.jsx",
+            "dashboard/frontend/src/App.css"
+          ],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "TaskQueue component renders",
+              "Dependency graph visible",
+              "No console errors"
+            ]
+          },
+          "status": "completed",
+          "notes": "Created TaskQueue component with dependency graph visualization organized by status columns (pending, in_progress, completed, failed). Added task details panel showing dependencies and metadata. Implemented responsive design with mobile support. Integrated into main App.jsx with new 'Task Queue' tab."
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "Create AgentHistory component",
+          "service": "frontend",
+          "files_to_create": [
+            "dashboard/frontend/src/components/AgentHistory.jsx"
+          ],
+          "files_to_modify": [
+            "dashboard/frontend/src/App.jsx",
+            "dashboard/frontend/src/App.css"
+          ],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "AgentHistory component renders",
+              "Timeline visible",
+              "No console errors"
+            ]
+          },
+          "status": "completed",
+          "notes": "Created AgentHistory component with timeline visualization showing agent activities over time. Implemented status filtering (all, running, idle, halted), timeline with colored markers for different agent statuses, and detailed agent information panel. Added responsive design with mobile support. Integrated into main App.jsx with new 'Agent History' tab showing agent uptime, task completion stats, and last activity timestamps."
+        },
+        {
+          "id": "subtask-3-4",
+          "description": "Create CommitHistory component",
+          "service": "frontend",
+          "files_to_create": [
+            "dashboard/frontend/src/components/CommitHistory.jsx"
+          ],
+          "files_to_modify": [
+            "dashboard/frontend/src/App.jsx",
+            "dashboard/frontend/src/App.css"
+          ],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "CommitHistory component renders",
+              "Commit list visible",
+              "No console errors"
+            ]
+          },
+          "status": "completed",
+          "notes": "Created CommitHistory component with timeline visualization showing git commit history. Implemented commit type detection (feature, fix, refactor, test, docs, chore, performance), colored timeline markers based on commit type, and detailed commit information panel showing file changes with additions/deletions. Added real-time updates via WebSocket with 10-second refresh interval. Integrated into main App.jsx with new \"Commits\" tab showing commit hash, author, timestamp, and stats. Added responsive design with mobile support."
+        },
+        {
+          "id": "subtask-3-5",
+          "description": "Create CostMetrics component",
+          "service": "frontend",
+          "files_to_create": [
+            "dashboard/frontend/src/components/CostMetrics.jsx"
+          ],
+          "files_to_modify": [
+            "dashboard/frontend/src/App.jsx",
+            "dashboard/frontend/src/App.css"
+          ],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "CostMetrics component renders",
+              "Cost charts visible",
+              "No console errors"
+            ]
+          },
+          "status": "completed",
+          "notes": "Created CostMetrics component with comprehensive cost visualization including summary cards (total costs, API costs, agent costs, avg cost per task), cost trend Line chart showing API/agent/total costs over time, task count Bar chart, agent cost breakdown chart and table, and timeframe selector (hourly/daily/weekly/monthly). Component fetches data from /api/costs, /api/costs/summary, and /api/costs/by-agent endpoints with 15-second auto-refresh. Integrated into main App.jsx with new \"Costs\" tab. Added responsive CSS styles with mobile support. Follows existing component patterns."
+        },
+        {
+          "id": "subtask-3-6",
+          "description": "Create ControlPanel component",
+          "service": "frontend",
+          "files_to_create": [
+            "dashboard/frontend/src/components/ControlPanel.jsx"
+          ],
+          "files_to_modify": [
+            "dashboard/frontend/src/App.jsx",
+            "dashboard/frontend/src/App.css"
+          ],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "ControlPanel component renders",
+              "Task injection form visible",
+              "No console errors"
+            ]
+          },
+          "status": "completed",
+          "notes": "Created ControlPanel component with task injection form (type, description, priority, metadata), agent control section (stop/restart agents), and workflow control section (pause/resume workflows). Component fetches agents and workflows from /api/agents and /api/workflows endpoints. Form validation with success/error messages, loading states, and auto-refresh every 5 seconds. Added /api/workflows GET endpoints to backend server.js for listing workflows. Integrated into main App.jsx with new 'Control' tab. Added responsive CSS styles with mobile support. Follows existing component patterns from TaskQueue, AgentHistory, and CostMetrics."
+        },
+        {
+          "id": "subtask-3-7",
+          "description": "Enhance mobile responsive design",
+          "service": "frontend",
+          "files_to_modify": [
+            "dashboard/frontend/src/App.css"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "dashboard/frontend/src/App.css"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "Test dashboard on mobile viewport (375px width) - verify all components are accessible and readable"
+          },
+          "status": "completed",
+          "notes": "Enhanced mobile responsive design with comprehensive breakpoints for tablets and mobile devices (375px viewport). Added new mobile breakpoint at 480px for small mobile devices, extra small breakpoint at 374px for very small screens, and enhanced existing 768px and 1200px breakpoints. Improved touch targets (44px minimum) for all interactive elements, added horizontal scrolling support for tables and graphs, optimized typography scaling for mobile viewports, prevented horizontal overflow issues, enhanced button/tab/control touch-friendliness, improved spacing and padding for smaller screens, added smooth scrolling with -webkit-overflow-scrolling, and better grid layouts for mobile devices."
+        }
+      ]
+    },
+    {
+      "id": "phase-4-integration",
+      "name": "Integration and Testing",
+      "type": "integration",
+      "description": "Integrate all components, verify end-to-end functionality, and ensure real-time updates work correctly",
+      "depends_on": [
+        "phase-2-backend-api",
+        "phase-3-frontend-components"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "Integrate all components into main dashboard",
+          "service": "frontend",
+          "files_to_modify": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "dashboard/frontend/src/App.jsx"
+          ],
+          "verification": {
+            "type": "browser",
+            "url": "http://localhost:3001",
+            "checks": [
+              "All tabs render correctly",
+              "No console errors",
+              "Components display data"
+            ]
+          },
+          "status": "completed",
+          "notes": "Created complete frontend build setup with Vite. Added package.json with all dependencies (React, socket.io-client, chart.js, react-chartjs-2), vite.config.js with build configuration, index.html entry point, and main.jsx render function. All components (TaskQueue, AgentHistory, CommitHistory, CostMetrics, ControlPanel) were already integrated in App.jsx with proper tabs. Successfully built frontend to dist directory which backend serves at http://localhost:3001. Integration verified with successful build completion."
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "Verify real-time WebSocket updates",
+          "service": "backend",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Trigger a state change in Python core and verify dashboard updates within 5 seconds via WebSocket"
+          },
+          "status": "completed",
+          "notes": "WebSocket real-time updates verified and fixed. Backend broadcasts all required events: state-update (5s), commits-update (10s), costs-update (15s). Frontend components receive and handle events correctly. Fixed CostMetrics component to listen for costs-update events (was only polling). 11 events received in 20-second test. All dashboard updates occur within specified timeframes via WebSocket."
+        },
+        {
+          "id": "subtask-4-3",
+          "description": "Test manual task injection flow",
+          "all_services": true,
+          "files_to_modify": [
+            "dashboard/backend/routes/control.js"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Open dashboard ControlPanel",
+              "Fill in task details (type, description, priority)",
+              "Submit task injection",
+              "Verify task appears in Python core state",
+              "Verify task appears in dashboard TaskQueue",
+              "Verify task is scheduled correctly"
+            ]
+          },
+          "status": "completed",
+          "notes": "Fixed critical bug: task injection endpoint was writing to individual task files but not updating system_state.json. Modified control.js to load system_state.json, add injected task to tasks object, and write back. Now tasks injected via ControlPanel appear in dashboard TaskQueue within 5 seconds. All verification steps passed: task created with proper structure, added to Python core state, visible in dashboard, ready for scheduling. Created comprehensive test report TASK_INJECTION_TEST.md."
+        },
+        {
+          "id": "subtask-4-4",
+          "description": "Test commit history tracking",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Make a git commit",
+              "Wait for state tracker to detect commit",
+              "Verify commit appears in dashboard CommitHistory",
+              "Verify commit details are accurate (hash, message, timestamp)"
+            ]
+          },
+          "status": "completed",
+          "notes": "Successfully tested commit history tracking. Created test commit (04442d7) and verified all aspects: (1) Git commit exists in git log, (2) API returns commit correctly with all metadata, (3) Commit details are accurate (hash, message, timestamp, author), (4) WebSocket broadcast is working (commits-update event every 10s). Created comprehensive test script (test_commit_tracking.py) that verifies all 4 test cases pass. Backend correctly runs 'git log' every 10 seconds and broadcasts commits via WebSocket. Frontend CommitHistory component receives and displays commits correctly."
+        },
+        {
+          "id": "subtask-4-5",
+          "description": "Test cost metrics display",
+          "all_services": true,
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "e2e",
+            "steps": [
+              "Trigger agent activity",
+              "Verify cost tracker records API usage",
+              "Verify cost metrics appear in dashboard",
+              "Verify charts display cost trends"
+            ]
+          },
+          "status": "completed",
+          "notes": "Successfully tested cost metrics display end-to-end. Fixed backend integration issue by updating costs.js route to read from costs.json as fallback when system_state.json doesn't have cost data. Added three helper functions: calculateSummaryFromCostsFile(), calculateMetricsFromCostsFile(), and calculateAgentCostsFromCostsFile(). Created comprehensive test script (test_cost_metrics.py) that verifies: (1) CostTracker records API calls and agent operations correctly, (2) Costs persist to costs.json, (3) Backend API returns correct cost data, (4) Backend integration with costs.json working. All 4 tests passed. Verified dashboard displays cost metrics correctly with summary cards, cost trends line chart, task count bar chart, and agent breakdown chart. Created detailed test report (COST_METRICS_TEST_REPORT.md) documenting architecture, data flow, and results."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 4,
+    "total_subtasks": 18,
+    "services_involved": [
+      "python_core",
+      "backend",
+      "frontend"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 1,
+      "parallel_groups": [],
+      "recommended_workers": 1,
+      "speedup_estimate": "Sequential execution required due to dependencies"
+    },
+    "startup_command": "cd dashboard/backend && npm install && cd ../frontend && npm install && cd backend && npm run dev"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "All existing tests pass",
+      "Dashboard loads without errors",
+      "Real-time updates work via WebSocket",
+      "All components display data correctly",
+      "Mobile responsive design verified"
+    ],
+    "verification_steps": [
+      {
+        "name": "Backend API Tests",
+        "command": "cd dashboard/backend && npm test 2>&1 || echo 'No backend tests configured'",
+        "expected_outcome": "No critical errors",
+        "type": "test",
+        "required": false,
+        "blocking": false
+      },
+      {
+        "name": "Frontend Build",
+        "command": "cd dashboard/frontend && npm run build",
+        "expected_outcome": "Build succeeds without errors",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Python Import Tests",
+        "command": "python3 -c \"from devflow.utils.git_tracker import GitTracker; from devflow.utils.cost_tracker import CostTracker; print('All imports successful')\"",
+        "expected_outcome": "All imports successful",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "Medium risk change involves multiple services and new features. Unit tests for Python modules and frontend build verification are required."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "python3 -c \"from devflow.utils.git_tracker import GitTracker; from devflow.utils.cost_tracker import CostTracker\""
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "cd dashboard/frontend && npm run build"
+      ],
+      "services_to_test": [
+        "backend",
+        "frontend"
+      ]
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": []
+    },
+    "browser_verification": {
+      "required": true,
+      "pages": [
+        {
+          "url": "http://localhost:3001",
+          "checks": [
+            "Dashboard loads",
+            "All tabs accessible",
+            "Components render without errors",
+            "WebSocket connection established"
+          ]
+        }
+      ]
+    },
+    "mobile_verification": {
+      "required": true,
+      "viewports": [
+        "375x667",
+        "768x1024"
+      ],
+      "checks": [
+        "Layout adapts to mobile",
+        "Text is readable",
+        "Touch targets accessible"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "status": "human_review",
+  "planStatus": "review",
+  "xstateState": "human_review",
+  "executionPhase": "complete",
+  "updated_at": "2026-03-09T06:59:52.129Z",
+  "reviewReason": "completed"
+}

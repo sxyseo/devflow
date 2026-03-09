@@ -11,6 +11,7 @@ const path = require('path');
 const router = express.Router();
 
 const STATE_FILE = path.join(__dirname, '../../../.devflow/state/system_state.json');
+const COSTS_FILE = path.join(__dirname, '../../../.devflow/state/costs.json');
 
 /**
  * GET /api/costs
@@ -28,12 +29,35 @@ router.get('/', async (req, res) => {
 
     // Try to load actual state data
     let costData;
+    let hasRealData = false;
+
     try {
       const stateData = await fs.readFile(STATE_FILE, 'utf8');
       const state = JSON.parse(stateData);
       costData = calculateCostMetrics(state, timeframe, periodsLimit);
+
+      // Check if we have real cost data
+      if (costData.summary.totalCosts > 0) {
+        hasRealData = true;
+      }
     } catch (error) {
-      // If state file is not available, return mock data
+      // State file not available, will try costs.json next
+    }
+
+    // If no costs in system_state, try costs.json
+    if (!hasRealData) {
+      try {
+        const costsData = await fs.readFile(COSTS_FILE, 'utf8');
+        const costs = JSON.parse(costsData);
+        costData = calculateMetricsFromCostsFile(costs, timeframe, periodsLimit);
+        hasRealData = true;
+      } catch (error) {
+        // costs.json not available
+      }
+    }
+
+    // If still no data, use mock
+    if (!hasRealData) {
       costData = getMockCostData(timeframe, periodsLimit);
     }
 
@@ -51,13 +75,33 @@ router.get('/', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try {
     let summaryData;
+
+    // First try to get summary from system_state.json
     try {
       const stateData = await fs.readFile(STATE_FILE, 'utf8');
       const state = JSON.parse(stateData);
       summaryData = calculateCostSummary(state);
+
+      // If no costs found in system_state, try costs.json
+      if (summaryData.costs.total === 0) {
+        try {
+          const costsData = await fs.readFile(COSTS_FILE, 'utf8');
+          const costs = JSON.parse(costsData);
+          summaryData = calculateSummaryFromCostsFile(costs);
+        } catch (costsError) {
+          // costs.json not available, use system_state summary (even if zero)
+        }
+      }
     } catch (error) {
-      // If state file is not available, return mock data
-      summaryData = getMockCostSummary();
+      // If state file is not available, try costs.json
+      try {
+        const costsData = await fs.readFile(COSTS_FILE, 'utf8');
+        const costs = JSON.parse(costsData);
+        summaryData = calculateSummaryFromCostsFile(costs);
+      } catch (costsError) {
+        // Neither file available, return mock data
+        summaryData = getMockCostSummary();
+      }
     }
 
     res.json(summaryData);
@@ -74,12 +118,36 @@ router.get('/summary', async (req, res) => {
 router.get('/by-agent', async (req, res) => {
   try {
     let agentCosts;
+    let hasRealData = false;
+
+    // First try system_state.json
     try {
       const stateData = await fs.readFile(STATE_FILE, 'utf8');
       const state = JSON.parse(stateData);
       agentCosts = calculateCostsByAgent(state);
+
+      // Check if we have real data
+      if (agentCosts.length > 0 && agentCosts.some(a => a.totalCosts > 0)) {
+        hasRealData = true;
+      }
     } catch (error) {
-      // If state file is not available, return mock data
+      // State file not available
+    }
+
+    // If no data from system_state, try costs.json
+    if (!hasRealData) {
+      try {
+        const costsData = await fs.readFile(COSTS_FILE, 'utf8');
+        const costs = JSON.parse(costsData);
+        agentCosts = calculateAgentCostsFromCostsFile(costs);
+        hasRealData = true;
+      } catch (error) {
+        // costs.json not available
+      }
+    }
+
+    // If still no data, use mock
+    if (!hasRealData) {
       agentCosts = getMockCostsByAgent();
     }
 
@@ -399,6 +467,170 @@ function getMockCostsByAgent() {
       agentCosts: 1.9776
     }
   ];
+}
+
+/**
+ * Calculate summary from costs.json file
+ */
+function calculateSummaryFromCostsFile(costs) {
+  const summary = costs.summary || {
+    total_cost: 0,
+    daily_cost: 0,
+    api_call_count: 0,
+    agent_operation_count: 0,
+    total_tokens: 0
+  };
+
+  // Calculate API and agent costs separately
+  let totalApiCosts = 0;
+  let totalAgentCosts = 0;
+
+  for (const call of Object.values(costs.api_calls || {})) {
+    totalApiCosts += call.cost || 0;
+  }
+
+  for (const op of Object.values(costs.agent_operations || {})) {
+    totalAgentCosts += op.cost || 0;
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    costs: {
+      api: parseFloat(totalApiCosts.toFixed(4)),
+      agents: parseFloat(totalAgentCosts.toFixed(4)),
+      total: parseFloat((totalApiCosts + totalAgentCosts).toFixed(4))
+    },
+    tasks: {
+      total: summary.api_call_count + summary.agent_operation_count,
+      completed: summary.api_call_count + summary.agent_operation_count,
+      averageCostPerTask: (totalApiCosts + totalAgentCosts) > 0
+        ? ((totalApiCosts + totalAgentCosts) / (summary.api_call_count + summary.agent_operation_count)).toFixed(4)
+        : '0.0000'
+    },
+    agents: {
+      total: Object.keys(costs.agent_operations || {}).length || 0,
+      active: 0
+    }
+  };
+}
+
+/**
+ * Calculate metrics from costs.json file
+ */
+function calculateMetricsFromCostsFile(costs, timeframe, limit) {
+  const periodsLimit = parseInt(limit, 10) || 30;
+  const now = new Date();
+
+  // Initialize periods
+  const costsByPeriod = {};
+  for (let i = 0; i < periodsLimit; i++) {
+    const periodKey = getPeriodKey(now, i, timeframe);
+    costsByPeriod[periodKey] = {
+      period: periodKey,
+      timestamp: getPeriodTimestamp(now, i, timeframe),
+      apiCosts: 0,
+      agentCosts: 0,
+      totalCosts: 0,
+      taskCount: 0,
+      agentCount: 0
+    };
+  }
+
+  // Aggregate API calls by period
+  for (const call of Object.values(costs.api_calls || {})) {
+    const periodKey = getPeriodKeyFromTimestamp(call.timestamp, timeframe);
+    if (costsByPeriod[periodKey]) {
+      costsByPeriod[periodKey].apiCosts += call.cost || 0;
+      costsByPeriod[periodKey].taskCount += 1;
+    }
+  }
+
+  // Aggregate agent operations by period
+  for (const op of Object.values(costs.agent_operations || {})) {
+    const periodKey = getPeriodKeyFromTimestamp(op.timestamp, timeframe);
+    if (costsByPeriod[periodKey]) {
+      costsByPeriod[periodKey].agentCosts += op.cost || 0;
+      costsByPeriod[periodKey].taskCount += 1;
+    }
+  }
+
+  // Calculate totals
+  for (const period of Object.values(costsByPeriod)) {
+    period.totalCosts = period.apiCosts + period.agentCosts;
+    period.apiCosts = parseFloat(period.apiCosts.toFixed(4));
+    period.agentCosts = parseFloat(period.agentCosts.toFixed(4));
+    period.totalCosts = parseFloat(period.totalCosts.toFixed(4));
+  }
+
+  return {
+    timeframe,
+    data: Object.values(costsByPeriod).reverse(),
+    summary: {
+      totalApiCosts: Object.values(costsByPeriod).reduce((sum, p) => sum + p.apiCosts, 0).toFixed(4),
+      totalAgentCosts: Object.values(costsByPeriod).reduce((sum, p) => sum + p.agentCosts, 0).toFixed(4),
+      totalCosts: Object.values(costsByPeriod).reduce((sum, p) => sum + p.totalCosts, 0).toFixed(4),
+      totalTasks: Object.values(costsByPeriod).reduce((sum, p) => sum + p.taskCount, 0)
+    }
+  };
+}
+
+/**
+ * Calculate agent costs from costs.json file
+ */
+function calculateAgentCostsFromCostsFile(costs) {
+  const agentCosts = {};
+
+  // Group costs by agent type
+  for (const op of Object.values(costs.agent_operations || {})) {
+    const agentType = op.agent_type || 'unknown';
+    if (!agentCosts[agentType]) {
+      agentCosts[agentType] = {
+        agentId: agentType,
+        agentName: agentType.charAt(0).toUpperCase() + agentType.slice(1),
+        status: 'idle',
+        taskCount: 0,
+        totalCosts: 0,
+        apiCosts: 0,
+        agentCosts: 0
+      };
+    }
+    agentCosts[agentType].taskCount += 1;
+    agentCosts[agentType].agentCosts += op.cost || 0;
+    agentCosts[agentType].totalCosts += op.cost || 0;
+  }
+
+  // Add API calls as separate "agents" by provider
+  const providerAgents = {};
+  for (const call of Object.values(costs.api_calls || {})) {
+    const provider = call.provider || 'unknown';
+    const agentName = `${provider.charAt(0).toUpperCase() + provider.slice(1)} API`;
+    if (!providerAgents[agentName]) {
+      providerAgents[agentName] = {
+        agentId: provider,
+        agentName: agentName,
+        status: 'running',
+        taskCount: 0,
+        totalCosts: 0,
+        apiCosts: 0,
+        agentCosts: 0
+      };
+    }
+    providerAgents[agentName].taskCount += 1;
+    providerAgents[agentName].apiCosts += call.cost || 0;
+    providerAgents[agentName].totalCosts += call.cost || 0;
+  }
+
+  // Merge agent operations and API providers
+  const allAgentCosts = [...Object.values(agentCosts), ...Object.values(providerAgents)];
+
+  // Round all costs
+  for (const agent of allAgentCosts) {
+    agent.apiCosts = parseFloat(agent.apiCosts.toFixed(4));
+    agent.agentCosts = parseFloat(agent.agentCosts.toFixed(4));
+    agent.totalCosts = parseFloat(agent.totalCosts.toFixed(4));
+  }
+
+  return allAgentCosts;
 }
 
 module.exports = router;
