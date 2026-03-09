@@ -4,7 +4,7 @@
     "9bf4a80b-176b-4ea5-a93a-db22cdbec405": {
       "id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
       "type": "planning",
-      "description": "Generate product brief for: OpenClaw \u81ea\u6cbb\u5f00\u53d1 Agent - \u81ea\u52a8\u8fed\u4ee3\u3001\u81ea\u52a8\u8fdb\u5316\u3001\u81ea\u52a8\u5b66\u4e60\u3001\u81ea\u52a8\u4fee\u590d Bug",
+      "description": "Generate product brief for: OpenClaw 自治开发 Agent - 自动迭代、自动进化、自动学习、自动修复 Bug",
       "priority": 2,
       "dependencies": [],
       "status": "failed",
