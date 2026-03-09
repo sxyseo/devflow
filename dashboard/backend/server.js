@@ -11,6 +11,9 @@ const http = require('http');
 const fs = require('fs').promises;
 const path = require('path');
 
+// Import routes
+const commitsRouter = require('./routes/commits');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -51,6 +54,9 @@ loadState();
 setInterval(loadState, 5000);
 
 // API Routes
+
+// Mount routers
+app.use('/api/commits', commitsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
