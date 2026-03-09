@@ -1,11 +1,11 @@
 {
   "active_run": {
-    "run_id": "run-20260310-065509",
+    "run_id": "run-20260310-075548",
     "spec": "openclaw-autonomy",
     "task_id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
     "status": "in_progress",
-    "started_at": "2026-03-10T06:55:09.129006",
-    "last_updated": "2026-03-10T06:55:09.129007"
+    "started_at": "2026-03-10T07:55:48.301453",
+    "last_updated": "2026-03-10T07:55:48.301455"
   },
   "runs": {
     "run-20260309-054500": {
@@ -279,6 +279,14 @@
       "status": "in_progress",
       "started_at": "2026-03-10T06:55:09.129006",
       "last_updated": "2026-03-10T06:55:09.129007"
+    },
+    "run-20260310-075548": {
+      "run_id": "run-20260310-075548",
+      "spec": "openclaw-autonomy",
+      "task_id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "status": "in_progress",
+      "started_at": "2026-03-10T07:55:48.301453",
+      "last_updated": "2026-03-10T07:55:48.301455"
     }
   }
 }
