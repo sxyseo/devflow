@@ -112,10 +112,10 @@
       "status": "in_progress",
       "assigned_to": "system",
       "created_at": "2026-03-07T13:22:02.887215",
-      "started_at": "2026-03-10T00:55:47.900556",
-      "completed_at": "2026-03-10T00:55:47.900536",
+      "started_at": "2026-03-10T01:57:41.353433",
+      "completed_at": "2026-03-10T01:57:41.353410",
       "result": null,
-      "error": "Task timeout: No execution engine running. Task was in progress for ~72 minutes with no output generated.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.",
+      "error": "Task timeout: No execution engine running. Task was in progress for ~72 minutes with no output generated.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.. Reset to pending for retry.",
       "retry_count": 0
     },
     "0adcf958-bddc-429d-89fc-20c48f90a4f7": {
