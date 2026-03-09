@@ -41,19 +41,50 @@ router.post('/inject-task', async (req, res) => {
       return res.status(400).json({ error: 'Priority must be between 1 and 5' });
     }
 
-    // Generate task ID
-    const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Generate task ID with UUID format for consistency
+    const taskId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create task object
+    // Create task object with all required fields
     const task = {
       id: taskId,
       type,
       description,
       priority: taskPriority,
       status: 'pending',
-      createdAt: new Date().toISOString(),
+      dependencies: [],
+      assigned_to: null,
+      created_at: new Date().toISOString(),
+      started_at: null,
+      completed_at: null,
+      result: null,
+      error: null,
+      retry_count: 0,
       metadata
     };
+
+    // Load current system state
+    let systemState;
+    try {
+      const stateData = await fs.readFile(STATE_FILE, 'utf8');
+      systemState = JSON.parse(stateData);
+    } catch (error) {
+      // If state file doesn't exist, create minimal state
+      systemState = {
+        agents: {},
+        tasks: {},
+        workflows: {},
+        metrics: {}
+      };
+    }
+
+    // Add task to system state
+    if (!systemState.tasks) {
+      systemState.tasks = {};
+    }
+    systemState.tasks[taskId] = task;
+
+    // Write updated system state back to file
+    await fs.writeFile(STATE_FILE, JSON.stringify(systemState, null, 2));
 
     // Ensure tasks directory exists
     try {
@@ -62,7 +93,7 @@ router.post('/inject-task', async (req, res) => {
       // Directory might already exist, ignore error
     }
 
-    // Write task to file
+    // Write task to individual file (for backup/logging)
     const taskFile = path.join(TASKS_DIR, `${taskId}.json`);
     await fs.writeFile(taskFile, JSON.stringify(task, null, 2));
 
