@@ -167,11 +167,27 @@ app.post('/api/actions/restart', (req, res) => {
 });
 
 // WebSocket connection
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log('Client connected:', socket.id);
 
   // Send current state on connection
   socket.emit('state-update', calculateMetrics());
+
+  // Send initial commits data
+  try {
+    const initialCommits = await getRecentCommits();
+    socket.emit('commits-update', initialCommits);
+  } catch (error) {
+    console.error('Error sending initial commits:', error.message);
+  }
+
+  // Send initial costs data
+  try {
+    const initialCosts = await getCostSummary();
+    socket.emit('costs-update', initialCosts);
+  } catch (error) {
+    console.error('Error sending initial costs:', error.message);
+  }
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -183,6 +199,26 @@ setInterval(() => {
   const metrics = calculateMetrics();
   io.emit('state-update', metrics);
 }, 5000);
+
+// Broadcast commits updates
+setInterval(async () => {
+  try {
+    const commits = await getRecentCommits();
+    io.emit('commits-update', commits);
+  } catch (error) {
+    console.error('Error broadcasting commits update:', error.message);
+  }
+}, 10000); // Check for new commits every 10 seconds
+
+// Broadcast costs updates
+setInterval(async () => {
+  try {
+    const costs = await getCostSummary();
+    io.emit('costs-update', costs);
+  } catch (error) {
+    console.error('Error broadcasting costs update:', error.message);
+  }
+}, 15000); // Update costs every 15 seconds
 
 // Helper functions
 function calculateMetrics() {
@@ -221,6 +257,162 @@ function calculateMetrics() {
       nodeVersion: process.version
     }
   };
+}
+
+/**
+ * Get recent commits for WebSocket broadcast
+ */
+async function getRecentCommits() {
+  try {
+    const { exec } = require('child_process');
+    const repoRoot = path.join(__dirname, '../../../');
+    const commitsLimit = 10;
+
+    return new Promise((resolve) => {
+      const gitCommand = `cd "${repoRoot}" && git log -${commitsLimit} --pretty=format:'%H|%an|%ae|%ad|%s|%b' --date=iso`;
+
+      exec(gitCommand, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
+        if (error) {
+          // Return mock data if git is not available
+          resolve(getMockCommitsData(commitsLimit));
+          return;
+        }
+
+        const commits = parseCommitsData(stdout);
+        resolve(commits);
+      });
+    });
+  } catch (error) {
+    console.error('Error getting recent commits:', error.message);
+    return getMockCommitsData(10);
+  }
+}
+
+/**
+ * Parse git log output for commits
+ */
+function parseCommitsData(gitOutput) {
+  if (!gitOutput || gitOutput.trim() === '') {
+    return [];
+  }
+
+  const lines = gitOutput.trim().split('\n');
+  return lines.map(line => {
+    const [hash, author, email, date, subject, ...bodyParts] = line.split('|');
+    const body = bodyParts.join('|') || '';
+
+    return {
+      hash,
+      shortHash: hash.substring(0, 7),
+      author: {
+        name: author,
+        email: email
+      },
+      date: date,
+      message: {
+        subject: subject || '',
+        body: body || ''
+      }
+    };
+  });
+}
+
+/**
+ * Get mock commits data for when git is not available
+ */
+function getMockCommitsData(limit) {
+  const mockCommits = [
+    {
+      hash: 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0',
+      shortHash: 'a1b2c3d',
+      author: {
+        name: 'Auto Claude',
+        email: 'auto-claude@devflow.local'
+      },
+      date: new Date().toISOString(),
+      message: {
+        subject: 'feat: Add real-time WebSocket events',
+        body: 'Implement commits-update and costs-update events'
+      }
+    },
+    {
+      hash: 'b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1',
+      shortHash: 'b2c3d4e',
+      author: {
+        name: 'Auto Claude',
+        email: 'auto-claude@devflow.local'
+      },
+      date: new Date(Date.now() - 3600000).toISOString(),
+      message: {
+        subject: 'fix: Improve error handling in API routes',
+        body: 'Add better error messages and logging'
+      }
+    }
+  ];
+
+  return mockCommits.slice(0, limit);
+}
+
+/**
+ * Get cost summary for WebSocket broadcast
+ */
+async function getCostSummary() {
+  try {
+    const tasks = Object.values(systemState.tasks || {});
+    const agents = Object.values(systemState.agents || {});
+
+    let totalApiCosts = 0;
+    let totalAgentCosts = 0;
+    let totalTasks = tasks.length;
+    let completedTasks = 0;
+
+    for (const task of tasks) {
+      if (task.costs) {
+        totalApiCosts += task.costs.api || 0;
+        totalAgentCosts += task.costs.agent || 0;
+      }
+      if (task.status === 'completed') {
+        completedTasks += 1;
+      }
+    }
+
+    return {
+      timestamp: new Date().toISOString(),
+      costs: {
+        api: parseFloat(totalApiCosts.toFixed(4)),
+        agents: parseFloat(totalAgentCosts.toFixed(4)),
+        total: parseFloat((totalApiCosts + totalAgentCosts).toFixed(4))
+      },
+      tasks: {
+        total: totalTasks,
+        completed: completedTasks,
+        averageCostPerTask: totalTasks > 0 ? parseFloat(((totalApiCosts + totalAgentCosts) / totalTasks).toFixed(4)) : 0
+      },
+      agents: {
+        total: agents.length,
+        active: agents.filter(a => a.status === 'running').length
+      }
+    };
+  } catch (error) {
+    console.error('Error getting cost summary:', error.message);
+    return {
+      timestamp: new Date().toISOString(),
+      costs: {
+        api: 0,
+        agents: 0,
+        total: 0
+      },
+      tasks: {
+        total: 0,
+        completed: 0,
+        averageCostPerTask: 0
+      },
+      agents: {
+        total: 0,
+        active: 0
+      }
+    };
+  }
 }
 
 // Serve frontend for all other routes
