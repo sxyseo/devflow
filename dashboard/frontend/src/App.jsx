@@ -23,6 +23,7 @@ import TaskQueue from './components/TaskQueue';
 import AgentHistory from './components/AgentHistory';
 import CommitHistory from './components/CommitHistory';
 import CostMetrics from './components/CostMetrics';
+import ControlPanel from './components/ControlPanel';
 
 ChartJS.register(
   CategoryScale,
@@ -198,6 +199,12 @@ function App() {
         >
           Costs
         </button>
+        <button
+          className={activeTab === 'control' ? 'active' : ''}
+          onClick={() => setActiveTab('control')}
+        >
+          Control
+        </button>
       </nav>
 
       <main>
@@ -323,6 +330,10 @@ function App() {
 
         {activeTab === 'costs' && (
           <CostMetrics />
+        )}
+
+        {activeTab === 'control' && (
+          <ControlPanel />
         )}
       </main>
     </div>

@@ -114,6 +114,20 @@ app.get('/api/workflows', (req, res) => {
   res.json(workflows);
 });
 
+app.get('/api/workflows/:id', (req, res) => {
+  const workflow = systemState.workflows[req.params.id];
+  if (!workflow) {
+    return res.status(404).json({ error: 'Workflow not found' });
+  }
+  res.json(workflow);
+});
+
+// Workflows
+app.get('/api/workflows', (req, res) => {
+  const workflows = Object.values(systemState.workflows || {});
+  res.json(workflows);
+});
+
 // Metrics
 app.get('/api/metrics', (req, res) => {
   const metrics = calculateMetrics();
