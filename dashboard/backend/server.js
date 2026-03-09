@@ -14,6 +14,7 @@ const path = require('path');
 // Import routes
 const commitsRouter = require('./routes/commits');
 const costsRouter = require('./routes/costs');
+const controlRouter = require('./routes/control');
 
 const app = express();
 const server = http.createServer(app);
@@ -59,6 +60,7 @@ setInterval(loadState, 5000);
 // Mount routers
 app.use('/api/commits', commitsRouter);
 app.use('/api/costs', costsRouter);
+app.use('/api/control', controlRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
