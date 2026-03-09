@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
+import { io } from 'socket.io-client';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -39,17 +40,32 @@ function CostMetrics() {
   const [timeframe, setTimeframe] = useState('daily');
 
   useEffect(() => {
+    // Connect to WebSocket for real-time updates
+    const socket = io(API_BASE);
+
+    socket.on('costs-update', (data) => {
+      if (data) {
+        setSummary(data);
+        setLoading(false);
+      }
+    });
+
+    // Initial fetch
     fetchCosts();
     fetchSummary();
     fetchAgentCosts();
 
+    // Periodic refresh as fallback
     const interval = setInterval(() => {
       fetchCosts();
       fetchSummary();
       fetchAgentCosts();
     }, 15000);
 
-    return () => clearInterval(interval);
+    return () => {
+      socket.disconnect();
+      clearInterval(interval);
+    };
   }, [timeframe]);
 
   const fetchCosts = async () => {
