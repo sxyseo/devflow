@@ -1,5 +1,12 @@
 {
-  "active_run": null,
+  "active_run": {
+    "run_id": "run-20260310-165944",
+    "spec": "openclaw-autonomy",
+    "task_id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+    "status": "in_progress",
+    "started_at": "2026-03-10T16:59:44.451191",
+    "last_updated": "2026-03-10T16:59:44.451191"
+  },
   "runs": {
     "run-20260309-054500": {
       "run_id": "run-20260309-054500",
@@ -338,6 +345,14 @@
       "last_updated": "2026-03-10T12:55:11.490872",
       "completed_at": "2026-03-10T14:00:23.937051",
       "error": "Task timeout: Timed out after 60 minutes"
+    },
+    "run-20260310-165944": {
+      "run_id": "run-20260310-165944",
+      "spec": "openclaw-autonomy",
+      "task_id": "9bf4a80b-176b-4ea5-a93a-db22cdbec405",
+      "status": "in_progress",
+      "started_at": "2026-03-10T16:59:44.451191",
+      "last_updated": "2026-03-10T16:59:44.451191"
     }
   }
 }
