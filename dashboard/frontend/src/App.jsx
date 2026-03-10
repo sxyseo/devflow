@@ -19,6 +19,11 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import TaskQueue from './components/TaskQueue';
+import AgentHistory from './components/AgentHistory';
+import CommitHistory from './components/CommitHistory';
+import CostMetrics from './components/CostMetrics';
+import ControlPanel from './components/ControlPanel';
 
 ChartJS.register(
   CategoryScale,
@@ -170,6 +175,36 @@ function App() {
         >
           Tasks
         </button>
+        <button
+          className={activeTab === 'queue' ? 'active' : ''}
+          onClick={() => setActiveTab('queue')}
+        >
+          Task Queue
+        </button>
+        <button
+          className={activeTab === 'history' ? 'active' : ''}
+          onClick={() => setActiveTab('history')}
+        >
+          Agent History
+        </button>
+        <button
+          className={activeTab === 'commits' ? 'active' : ''}
+          onClick={() => setActiveTab('commits')}
+        >
+          Commits
+        </button>
+        <button
+          className={activeTab === 'costs' ? 'active' : ''}
+          onClick={() => setActiveTab('costs')}
+        >
+          Costs
+        </button>
+        <button
+          className={activeTab === 'control' ? 'active' : ''}
+          onClick={() => setActiveTab('control')}
+        >
+          Control
+        </button>
       </nav>
 
       <main>
@@ -279,6 +314,26 @@ function App() {
               </table>
             )}
           </div>
+        )}
+
+        {activeTab === 'queue' && (
+          <TaskQueue />
+        )}
+
+        {activeTab === 'history' && (
+          <AgentHistory />
+        )}
+
+        {activeTab === 'commits' && (
+          <CommitHistory />
+        )}
+
+        {activeTab === 'costs' && (
+          <CostMetrics />
+        )}
+
+        {activeTab === 'control' && (
+          <ControlPanel />
         )}
       </main>
     </div>

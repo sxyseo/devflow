@@ -1,0 +1,86 @@
+{
+  "api_calls": {
+    "test-call-1": {
+      "id": "test-call-1",
+      "type": "api_call",
+      "provider": "anthropic",
+      "model": "claude-3-sonnet",
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "total_tokens": 1500,
+      "cost": 0.0035,
+      "timestamp": "2026-03-09T06:57:13.440478",
+      "metadata": {
+        "task_id": "task-1",
+        "operation": "code_generation"
+      }
+    },
+    "test-call-2": {
+      "id": "test-call-2",
+      "type": "api_call",
+      "provider": "anthropic",
+      "model": "claude-3-opus",
+      "input_tokens": 2000,
+      "output_tokens": 1000,
+      "total_tokens": 3000,
+      "cost": 0.015,
+      "timestamp": "2026-03-09T06:57:13.440781",
+      "metadata": {
+        "task_id": "task-2",
+        "operation": "analysis"
+      }
+    },
+    "test-call-3": {
+      "id": "test-call-3",
+      "type": "api_call",
+      "provider": "openai",
+      "model": "gpt-4",
+      "input_tokens": 500,
+      "output_tokens": 300,
+      "total_tokens": 800,
+      "cost": 0.006,
+      "timestamp": "2026-03-09T06:57:13.440899",
+      "metadata": {
+        "task_id": "task-3",
+        "operation": "review"
+      }
+    }
+  },
+  "agent_operations": {
+    "agent-op-1": {
+      "id": "agent-op-1",
+      "type": "agent_operation",
+      "agent_type": "code_generation",
+      "operation": "generate_component",
+      "duration_seconds": 45.5,
+      "cost": 0.001,
+      "timestamp": "2026-03-09T06:57:13.441008",
+      "metadata": {
+        "task_id": "task-1",
+        "component": "UserDashboard"
+      }
+    },
+    "agent-op-2": {
+      "id": "agent-op-2",
+      "type": "agent_operation",
+      "agent_type": "testing",
+      "operation": "run_tests",
+      "duration_seconds": 120.0,
+      "cost": 0.0025,
+      "timestamp": "2026-03-09T06:57:13.441103",
+      "metadata": {
+        "task_id": "task-2",
+        "tests_run": 25
+      }
+    }
+  },
+  "token_usage": {},
+  "resource_costs": {},
+  "summary": {
+    "total_cost": 0.08400000000000002,
+    "daily_cost": 0.08400000000000002,
+    "api_call_count": 9,
+    "agent_operation_count": 6,
+    "total_tokens": 15900
+  }
+}

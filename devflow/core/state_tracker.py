@@ -12,6 +12,8 @@ from typing import Dict, List, Any, Optional
 from enum import Enum
 
 from ..config.settings import settings
+from ..utils.git_tracker import GitTracker, CommitType
+from ..utils.cost_tracker import CostTracker, CostType
 
 
 class AgentStatus(Enum):
@@ -54,6 +56,10 @@ class StateTracker:
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self.workflows: Dict[str, Dict[str, Any]] = {}
         self.metrics: Dict[str, Any] = {}
+
+        # Initialize git and cost tracking
+        self.git_tracker = GitTracker()
+        self.cost_tracker = CostTracker()
 
         # Load existing state if available
         self.load()
@@ -198,6 +204,80 @@ class StateTracker:
 
             return ready_tasks[:limit] if limit else ready_tasks
 
+    # Git tracking methods
+
+    def record_commit(self, commit_hash: str, message: str, author: str,
+                     branch: str, files_changed: List[str] = None,
+                     commit_type: CommitType = CommitType.AUTO,
+                     task_id: str = None, agent_id: str = None,
+                     lines_added: int = 0, lines_deleted: int = 0):
+        """Record a git commit."""
+        self.git_tracker.record_commit(
+            commit_hash=commit_hash,
+            message=message,
+            author=author,
+            branch=branch,
+            files_changed=files_changed,
+            commit_type=commit_type,
+            task_id=task_id,
+            agent_id=agent_id,
+            lines_added=lines_added,
+            lines_deleted=lines_deleted,
+        )
+
+    def get_commits_by_task(self, task_id: str) -> List[Dict[str, Any]]:
+        """Get all commits for a specific task."""
+        return self.git_tracker.get_commits_by_task(task_id)
+
+    def get_commits_by_agent(self, agent_id: str) -> List[Dict[str, Any]]:
+        """Get all commits by a specific agent."""
+        return self.git_tracker.get_commits_by_agent(agent_id)
+
+    def get_recent_commits(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get recent commits."""
+        return self.git_tracker.get_recent_commits(limit)
+
+    def get_commit_stats(self) -> Dict[str, Any]:
+        """Get git commit statistics."""
+        return self.git_tracker.get_commit_stats()
+
+    # Cost tracking methods
+
+    def record_api_call(self, call_id: str, provider: str, model: str,
+                       input_tokens: int, output_tokens: int,
+                       cost: float, metadata: Dict[str, Any] = None):
+        """Record an API call with associated costs."""
+        self.cost_tracker.record_api_call(
+            call_id=call_id,
+            provider=provider,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost=cost,
+            metadata=metadata,
+        )
+
+    def record_agent_operation(self, operation_id: str, agent_type: str,
+                              operation: str, duration_seconds: float,
+                              cost: float = 0.0, metadata: Dict[str, Any] = None):
+        """Record an agent operation with associated costs."""
+        self.cost_tracker.record_agent_operation(
+            operation_id=operation_id,
+            agent_type=agent_type,
+            operation=operation,
+            duration_seconds=duration_seconds,
+            cost=cost,
+            metadata=metadata,
+        )
+
+    def get_cost_summary(self) -> Dict[str, Any]:
+        """Get a summary of all costs."""
+        return self.cost_tracker.get_cost_summary()
+
+    def get_daily_costs(self, days: int = 7) -> List[Dict[str, Any]]:
+        """Get daily costs for the specified number of days."""
+        return self.cost_tracker.get_daily_costs(days)
+
     def get_agent_status(self, agent_id: str) -> Optional[Dict[str, Any]]:
         """Get agent status."""
         return self.agents.get(agent_id)
@@ -227,6 +307,10 @@ class StateTracker:
             active_agents = sum(1 for a in self.agents.values()
                               if a["status"] == AgentStatus.RUNNING.value)
 
+            # Get git and cost metrics
+            git_stats = self.git_tracker.get_commit_stats()
+            cost_summary = self.cost_tracker.get_cost_summary()
+
             return {
                 "tasks": {
                     "total": total_tasks,
@@ -239,6 +323,18 @@ class StateTracker:
                     "total": total_agents,
                     "active": active_agents,
                     "idle": total_agents - active_agents,
+                },
+                "git": {
+                    "total_commits": git_stats.get("total_commits", 0),
+                    "total_lines_added": git_stats.get("total_lines_added", 0),
+                    "total_lines_deleted": git_stats.get("total_lines_deleted", 0),
+                    "net_lines": git_stats.get("net_lines", 0),
+                },
+                "costs": {
+                    "total_cost": cost_summary["summary"].get("total_cost", 0.0),
+                    "daily_cost": cost_summary["summary"].get("daily_cost", 0.0),
+                    "api_call_count": cost_summary["summary"].get("api_call_count", 0),
+                    "total_tokens": cost_summary["summary"].get("total_tokens", 0),
                 },
                 "timestamp": datetime.utcnow().isoformat(),
             }
@@ -257,6 +353,10 @@ class StateTracker:
         with open(self.state_file, 'w') as f:
             json.dump(state, f, indent=2, default=str)
 
+        # Save git and cost tracking data
+        self.git_tracker.save()
+        self.cost_tracker.save()
+
     def load(self):
         """Load state from disk."""
         if self.state_file.exists():
@@ -268,6 +368,10 @@ class StateTracker:
             self.workflows = state.get("workflows", {})
             self.metrics = state.get("metrics", {})
 
+        # Load git and cost tracking data
+        self.git_tracker.load()
+        self.cost_tracker.load()
+
     def reset(self):
         """Reset all state."""
         with self.lock:
@@ -276,3 +380,7 @@ class StateTracker:
             self.workflows.clear()
             self.metrics.clear()
             self.save()
+
+        # Reset git and cost tracking
+        self.git_tracker.reset()
+        self.cost_tracker.reset()
