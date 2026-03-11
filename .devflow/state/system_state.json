@@ -112,11 +112,11 @@
       "status": "in_progress",
       "assigned_to": "system",
       "created_at": "2026-03-07T13:22:02.887215",
-      "started_at": "2026-03-12T00:38:53.126986",
-      "completed_at": "2026-03-12T00:38:53.126957",
+      "started_at": "2026-03-12T02:10:28.234038",
+      "completed_at": "2026-03-12T02:10:28.234011",
       "result": null,
       "error": null,
-      "retry_count": 8
+      "retry_count": 9
     },
     "0adcf958-bddc-429d-89fc-20c48f90a4f7": {
       "id": "0adcf958-bddc-429d-89fc-20c48f90a4f7",
